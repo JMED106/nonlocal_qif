@@ -80,6 +80,16 @@ typedef struct {
   double perturbation_FR;	/* FR *** Amplitude of the perturbation FR*/
 } t_data;
 
+
+typedef struct {
+  double r;
+  double v;
+} t_FR;
+
+typedef struct {
+  int l;			/* Number of functional columns */
+} t_system;
+
 #ifndef GSL_SIGN
 #define GSL_SIGN(x) ((x) >= 0 ? 1: -1)
 #endif
