@@ -96,6 +96,7 @@ int main(int argc, char **argv) {
   t_FR *FR;
 
   FR = (t_FR*) calloc (FR,s->l*sizeof(t_FR)); /* We create our spatially extended systems (number of columns) */
+  /* Each FR[i] represents a cluster of neurons, i.e. the columns */
   
   /* ++++++++++++++++++++++++++++++++++++++++++++++++++ */
   
