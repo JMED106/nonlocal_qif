@@ -1,15 +1,10 @@
-/**********************************/
-/* Simulation of N neuron system. */
-/**********************************/
+/*********************************************/
+/* Simulation of the non-localized FR model. */
+/*********************************************/
 
-/*********************************/
-/* Features:			 */
-/* 				 */
-/* - Simulation of QIF		 */
-/* - Simulation of Theta neurons */
-/* - Simulation of FR equations	 */
-/*********************************/
-
+/*******************/
+/* Version alfa 1. */
+/*******************/
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -66,6 +61,8 @@ int main(int argc, char **argv) {
   omp_set_num_threads(numthreads);
 #endif  
 
+  /* +++++++++++++++++ External Things ++++++++++++++++++++++ */
+
   time_t t;   struct tm *tm;  t = time(NULL); tm = localtime(&t);
   if((argc >1) && (argv[1][1] == 'd')) {debug = 1; d_level = 1;} /* Initial debugging */
 
@@ -75,18 +72,6 @@ int main(int argc, char **argv) {
   sprintf(mesg,"Seed: %ld ",gsl_rng_default_seed);
   DEBUG(mesg);
   
-  /* Declaration of variables */
-  /* Contadores */
-  int i, time, tr_TT = 0;
-  int Nscan = 0;
-  /* Others */
-  int def = 1;			/* Default = 1 */
-  int temporal_correction = 1;
-  int total_spikes1 = 0;
-
-  double var_value;
-  double *final_conf;
-
   /* Date variables */
   char day[100], hour[100];
   strftime(day, 100, "%m-%d-%Y",tm);
@@ -95,37 +80,20 @@ int main(int argc, char **argv) {
   /* Data store */
   Create_Dir("results");
   FILE *file[8];
+
+  /* +++++++++++++++++ Simulation variables ++++++++++++++++ */
+
+  /* Parameters */
+  t_data *d;
+
+  /* Results Variables */
+  int Nscan;
+
+  /* Dynamic variables (system variables) */
   
-  /* System variables (magnitudes) */
-  t_th *th;			/* neuron vector */
-  double R = 0;			/* Kuramoto order parameter */
-
-  double fr_volt[2];		/* Stores width and center of the Lorentzian distr. (R) */
-  double fr_x;			/* Center of the Lorentzian distr. */
-  double fr_y;			/* Width  " " " " */
-  double perturbation = 0;
-
-  double fr, fr2;		/* Mean field (firing rate) */
-  double avg_fr1,avg2_fr1;
-  int medida;
-  double inst_fr_avg;
-  int intervalo;
-  int total_spikes_inst;
-
-  double avg_v1 = 0, avg_v2 = 0;
-  long double v1_center = 0;
-
-  double dt, *p, phi = 0;
-
-  double rh_final = 1, vh_final = 1; /* FR *** initial conds. for r and v ( FR equations) */
-
-  t_data *d, *data;
-  d = malloc(sizeof(*d));
-  data = malloc(sizeof(*data));
-
-  d->scan = 0;			/* Exploring is unabled by default */
-  d->MaxDim = 5000000;		/* Raster plot will be disabled for higher dim */
+  /* ++++++++++++++++++++++++++++++++++++++++++++++++++ */
   
+  /* Creating data files */
   sprintf(d->file,"%s_%s",day,hour);
   sprintf(mesg2,"results/%s",d->file);
   Create_Dir(mesg2);
@@ -136,14 +104,14 @@ int main(int argc, char **argv) {
   /*********************************/
   /* Program arguments assignation */
   /*********************************/
-  *data = Scan_Data(DATA_FILE,*d);
-  d = data;
+  /* *data = Scan_Data(DATA_FILE,*d); */
+  /* d = data; */
 
-  while((argc--) != 1) {	/* Terminal arguments can be handled */
-    *data = Arg(argv[argc], *d);
-    d = data;
-    if(argv[1][0] != '-') def = 0;
-  }
+  /* while((argc--) != 1) {	/\* Terminal arguments can be handled *\/ */
+  /*   *data = Arg(argv[argc], *d); */
+  /*   d = data; */
+  /*   if(argv[1][0] != '-') def = 0; */
+  /* } */
 
 #ifdef _OPENMP			/* Work is divided between the cores */
   int chunksize = d->N/numthreads;
@@ -151,302 +119,15 @@ int main(int argc, char **argv) {
 #endif
 
   /* Initial tunning: step size, and scanning issues */
-  Intro(d,&Nscan,&tr_TT);
-  if(d_level == 4){ temporal_correction = 0; DEBUG("Temporal correction is OFF");}
-  d->var_value = d->eta;
-  d->scan_max = Nscan;
-  d->pert = 0;
 
-  if(d->scan_mode == 3) {
-    d->pert = 1;
-    d->scan_mode = 2;
-  }
-  double dTT = d->TT;
-  double dTT2 = d->TT*2.0;
-
-  /* Configuration at the end of simulation */
-  final_conf  = (double*) malloc (d->N*sizeof(double));
 
   /**********************************/
   /* New simulations can start here */
   /**********************************/
   do {    
-    if(d->scan_mode >= 1) 
-      d = Var_update(d);
-    Data_Files(&file,*d,0);
-    Data_Files(&file,*d,4);
-    total_spikes1 = 0;
-    
-    /********************/
-    /* Oscillator setup */
-    /********************/
-    th  = (t_th*) calloc (d->N,sizeof(t_th)); 
-    for(i=0 ;i<d->N ;i++ ) {		/* The total number (N) is stored in each package */
-      th[i].N = d->N;
-    }
-    th[0].pert = 0;
-    th[0].rh = 1;
-    th[0].vh = 1;                       /* FR **** Initial condition for the FR equations */
 
-    p = (double*) malloc ((d->N+1)*sizeof(double));
+  } while (d->scan < Nscan);  /* Simulation ends here */
 
-    /* QIF: vr and vp and g */
-    for(i=0 ;i<d->N ;i++ ) {
-      th[i].vr = d->vr;
-      th[i].vp = d->vp;
-      th[i].g = d->g;
-    }
-    
-    
-    if(d->scan_mode == 2 && d->scan > 0) {
-      for(i=0 ;i<d->N ;i++ ) {
-	th[i].v = final_conf[i];                /* We mantain the last configuration of voltages */
-      }
-    } else {
-      InitialState(th,d->init_dist);		/* Initial state configuration */
-    }
-
-    for(i=0 ;i<d->N ;i++ ) {
-      th[i].spike = 0;		                /* Spike */
-      th[i].tr = 0;
-      th[i].tr2 = 0;
-    }
-    
-    dt = d->dt;
-
-    if(def == 0)		/* Debug message: data display */
-      DEBUG2(DataDebug(*d,&file));
-
-    if(d->scan_mode == 2 && d->scan > 0) {
-      th[0].rh = rh_final;	/* FR **** final configuration of the pevious ... */
-      th[0].vh = vh_final;	/* ... simulation is taken as the initial configuration */
-    }
-    
-    /** Distributions *******************/   
-
-    /* QIF: J */
-    sprintf(mesg,"Building distribution for J_i. J0 = %lf ",d->J );
-    if(d->J_dist == 1)  DEBUG(mesg);
-    p = InitCond(p,d->N,2,d->J,d->J_sigma);
-    if(d->J_dist == 0) {
-      for(i=0 ;i<d->N ;i++ ) 
-	th[i].J = d->J;
-    } else
-      for(i=0 ;i<d->N ;i++ ) 
-	th[i].J = p[i];
-  
-    /* QIF: eta */
-    sprintf(mesg,"Building distribution for eta_i. eta0 = %lf ",d->eta );
-    if(d->eta_dist == 1)  DEBUG(mesg);
-    p = InitCond(p,d->N,2,d->eta,d->eta_sigma);
-    if(d->eta_dist == 0) {
-      for(i=0 ;i<d->N ;i++ ) 
-	th[i].eta = d->eta;
-    } else {
-      for(i=0 ;i<d->N ;i++ ) 
-	th[i].eta = p[i];
-    }
-
-    /* QIF: V0 */
-    sprintf(mesg,"Building distribution for V0_i. V0 = %lf ",d->v0 );
-    if(d->v0_dist == 1)  DEBUG(mesg);
-    p = InitCond(p,d->N,2,d->v0,d->v0_sigma);
-    if(d->v0_dist == 0) {
-      for(i=0 ;i<d->N ;i++ ) 
-	th[i].V0 = d->v0;
-    } else
-      for(i=0 ;i<d->N ;i++ ) 
-	th[i].V0 = p[i];
-
-
-    /* Simulation */
-    sprintf(mesg,"Simulating dynamics of: v' = v² + I ");    DEBUG(mesg);
-    sprintf(mesg,"I = J*r + n - g*r(v - v0)");    DEBUG(mesg);
-    sprintf(mesg,"I = %.3lf*r + %.3lf - %.3lf*r(v - %.3lf) ",d->J,d->eta,d->g,d->v0);    DEBUG(mesg);
-
-    time = 0; fr = 0; fr2 = 0;  avg_fr1 = 0; 
-    avg2_fr1 = 0; medida = 0;
-    v1_center = 0; 
-    d->voltdist = 0;
-    intervalo = 0;
-    inst_fr_avg = 0;
-    total_spikes_inst = 0;
-
-    do {
-      /* In each step we must compute the mean field potential (r) */
-      if(time%((int)((float)d->TT/(10.0*dt))) == 0) { /* Control point */
-	sprintf(mesg,"%d%% ",(int)(((time*dt)/(float)d->TT)*100) );
-	DEBUG(mesg);
-      }
-      /* Parallelizable, watch out with pointers and shared variables */
-#pragma omp parallel for schedule(dynamic,chunksize)
-      for(i=0 ;i<d->N ;i++ ) {	/* i represents each oscillator */
-	th[i].r = fr;	
-	if(th[0].pert == 1) 
-	  th[i].r = th[0].FR;
-	th[i].r2 = fr2;
-	th[i].spike = 0;
-
-	if(temporal_correction == 1) {
-	  if(th[i].tr == 1) {
-	    th[i].tr = 2;
-	    th[i].spike = 1;
-	  } else if(th[i].tr == 2) {
-	    th[i].tr = 0;
-	  } else 
-	    th[i] = QIF(*d,th[i]);
-	} else {
-	  th[i] = QIF(*d, th[i]);
-	  if(th[i].tr == 1) th[i].spike = 1;
-	  th[i].tr = 0;
-	}
-
-	if(time*dt >= (d->TT/4.0)*3.0) 
-	  th[i].total_spikes += th[i].spike;
-      }
-      /* Simulation of rate equations */
-      th[0] = Theory(*d,th[0]);
-      /* Ends here */
-
-      fr = MeanField(th,d->dt,1);  
-      if((time*d->dt)/d->TT > 0.9) {
-	total_spikes1 += th[0].global_s1;
-
-	for(i=0 ;i<d->N ;i++ ) {
-	  v1_center += th[i].v;
-	}
-
-	v1_center /= d->N;
-	medida++;
-	avg_v1 += v1_center;
-      }
-      /* Inst FR */
-      total_spikes_inst += th[0].global_s1;
-      intervalo++;
-
-      if(abs(time - (int)(d->TT/d->dt)) <= 50) {
-	d->voltdist++;
-	Data_Files(&file,*d,2);
-	for(i=0 ;i<d->N ;i++ ) 
-	  fprintf(file[6],"%lf\n",th[i].v);
-	Data_Files(&file,*d,3);
-      }
-
-      if(d->disable_raster == 0)
-	for(i=0 ;i<d->N ;i++ ) {
-	  if(th[i].spike == 1)
-	    fprintf(file[2] ,"%lf\t%d\t-1\n",time*d->dt,i);
-	}
-      th[0].FR = 0;
-      th[0].pert = 0;
-      /* Perturbation introduced here */
-      if((time > (d->TT/d->dt)-100) && d->pert == 1 && d->dx >= 0) {
-	if(time == (d->TT/d->dt)-100 +1) {
-	  avg_fr1 = (double)total_spikes1/((double)medida*d->dt);
-	  avg_fr1 /= d->N;
-	  printf("\n Average FR 0: %.8lf",avg_fr1);
-	  fflush(stdout);	  
-	}
-	if(abs(time-(int)((d->TT/d->dt)-100))%5 == 0) {
-	  Perturbation(&th,*d,1);
-	  th[0].pert = 1;
-	  printf("\nPerturbation: %lf!!",d->pert_amplitude);
-	  perturbation = d->pert_amplitude;
-	}
-	if(time == (d->TT/d->dt)-1) {
-	  d->TT = dTT2;
-	  d->pert = 2;
-	}
-      } else if((time == (d->TT/d->dt)-1) && d->pert == 1) {
-	Perturbation(&th,*d,0);
-	th[0].vh += d->perturbation_FR; /* FR *** Perturbation for FR equations */
-	th[0].pert = 1;
-	printf("\nPerturbation: %lf!!",d->pert_amplitude);
-	perturbation = d->pert_amplitude;
-	d->TT = dTT2;
-	avg_fr1 = (double)total_spikes1/((double)medida*d->dt);
-	avg_fr1 /= d->N;
-	printf("\n Average FR 0: %.8lf",avg_fr1);
-	fflush(stdout);
-	d->pert = 2;
-      }
-      fprintf(file[3] ,"%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\n",time*dt,fr,R,phi,fr2,R,phi,th[0].rh,th[0].vh);
-      fprintf(file[0] ,"%lf\t%lf\t%lf\t%lf\n",time*d->dt,th[d->N/4].v,th[d->N/4].th,perturbation);
-
-      if(time%50 == 0) {
-	inst_fr_avg  = (double)total_spikes_inst/(double)intervalo;
-	inst_fr_avg  = inst_fr_avg/(d->N*d->dt);
-	intervalo = 0;
-	fprintf(file[7],"%lf\t%lf\n",time*d->dt,inst_fr_avg);
-	inst_fr_avg = 0;
-	total_spikes_inst = 0;
-      }
-      perturbation = 0;
-
-      time++;    
-    } while(time*d->dt< d->TT);
-
-    if(d->pert == 2) {
-      d->TT = dTT;
-      d->pert = 1;
-    }
-    avg_fr1 = (double)total_spikes1/((double)medida*d->dt);
-    avg_fr1 /= d->N;
-    printf("\n Average FR 1: %.8lf",avg_fr1);
-
-    avg_v1 /= medida;
-
-    R_script(*d,avg2_fr1,avg_v2);
-    R_calc(*d,&fr_x,&fr_y); /* fr: 0  voltage: 1 */
-    fr_volt[0] = fr_x;
-    fr_volt[1] = fr_y;
-    fr_x = 2*fr_x/(PI);
-    fr_y = 2*fr_y;
-
-    printf("\n Average Voltage (v) : %lf\n Average Voltage (Theta) : %lf",avg_v1, avg_v2);
-    printf("\n Average Voltage (v) using v distribution: %lf\n Average FR using v dist : %lf\n",fr_volt[1]*2,fr_volt[0]*(2.0/(PI)));
-
-    
-    if(d->scan_mode >= 1) {
-      switch(d->variable) {
-      case 1:
-	var_value = d->J;
-	break;
-      case 2:
-	var_value = d->eta;
-	break;
-      case 3:
-	var_value = d->g;
-	break;
-      case 4:
-	var_value = d->v0;
-	break;
-      }
-      fprintf(file[4] ,"%lf\t%lf\t%lf\t%lf\t%lf\t%lf\t%lf\n",var_value,avg_fr1,avg2_fr1,avg_v1, avg_v2,fr_x,fr_y);
-    }
-    
-    printf("\n");
-    free(p);
-    for(i=0 ;i<d->N ;i++ ) {
-      fprintf(file[1] ,"%d\t%lf\t%lf\n",i,th[i].v,th[i].th);
-      final_conf[i]  = th[i].v;
-    }
-
-    free(th);
-    d->scan++;
-    Data_Files(&file,*d,1);
-    Data_Files(&file,*d,5);
-    if(d->scan_mode == 0)
-      break;
-
-  } while (d->scan < Nscan);
-  /* Simulation ends here */
-
-
-  free(final_conf);
-
-  /* system("R -f histogram.R --quiet --slave"); */
-  /* Gnuplot_Init(*d,day,hour); */
   system("rm -r ./temp");
   printf("\n");
   return 0;  
