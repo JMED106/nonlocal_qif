@@ -41,8 +41,6 @@ t_th QIF(t_data d, t_th th) {
   /* if((th.th = rk4(th.th,th,dt,fptr)) >= PI) */
   /*   th.th = -PI; */
 
-  th.ph = VarChange(th);
-  /* th.th = th.ph; */
   return th;
 }
 
