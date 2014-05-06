@@ -82,14 +82,20 @@ int main(int argc, char **argv) {
   FILE *file[8];
 
   /* +++++++++++++++++ Simulation variables ++++++++++++++++ */
+  int i;
 
   /* Parameters */
   t_data *d;
+  t_system *s;
+  s->l = 1000;
 
   /* Results Variables */
   int Nscan;
 
   /* Dynamic variables (system variables) */
+  t_FR *FR;
+
+  FR = (t_FR*) calloc (FR,s->l*sizeof(t_FR)); /* We create our spatially extended systems (number of columns) */
   
   /* ++++++++++++++++++++++++++++++++++++++++++++++++++ */
   
@@ -126,6 +132,14 @@ int main(int argc, char **argv) {
   /**********************************/
   do {    
 
+    do {			/* Tiempo */
+      for(i=0 ;i<s->l ;i++ ) {	/* Espacio */
+	/* Asignamos la posición en la que nos encontramos x_i = -PI + i*dx, dónde dx = 2PI/l */
+	
+	/* Ejecutamos la función de las eqs. FR */
+	
+      }
+    } while(1);	              /* Paso temporal (se puede hacer de la misma manera que en el QIF */
   } while (d->scan < Nscan);  /* Simulation ends here */
 
   system("rm -r ./temp");
