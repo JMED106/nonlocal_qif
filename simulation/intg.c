@@ -24,7 +24,7 @@
  *   Variables:  dt,x
  * ======================================= */
 
-double Heun(double x, t_th prmts, double dt, double(* F)( double , t_th)) {
+double Heun(double x, t_qif prmts, double dt, double(* F)( double , t_qif)) {
   double xint = 0, x2 = 0;
 
   xint = x + dt*(*F)(x,prmts);
@@ -41,7 +41,7 @@ double Heun(double x, t_th prmts, double dt, double(* F)( double , t_th)) {
  *   Variables:  dt, x, F
  * ======================================= */
 
-double rk4(double x, t_th prmts, double dt, double (*F)(double ,t_th)) {
+double rk4(double x, t_qif prmts, double dt, double (*F)(double ,t_qif)) {
   double k1, k2, k3, k4;
 
   k1 = dt*(*F)(x,prmts);
@@ -57,7 +57,7 @@ double rk4(double x, t_th prmts, double dt, double (*F)(double ,t_th)) {
  *   Variables:  d, x, F
  * ======================================= */
 
-double rk42(double x, t_th prmts, t_data d, double (*F)(double ,t_th,t_data)) {
+double rk42(double x, t_qif prmts, t_data d, double (*F)(double ,t_qif,t_data)) {
   double k1, k2, k3, k4;
 
   k1 = d.dt*(*F)(x,prmts,d);
@@ -66,3 +66,19 @@ double rk42(double x, t_th prmts, t_data d, double (*F)(double ,t_th,t_data)) {
   k4 = d.dt*(*F)(x+k3,prmts,d);
   return (x + k1/6 + k2/3 + k3/3 + k4/6);
 }
+
+
+/* /\* === FUNCTION  rk4_void ==================== */
+/*  * Description:  Runge-Kutta, order 4 */
+/*  *   Variables:  d, x, F */
+/*  * ======================================= *\/ */
+
+/* double rk42(double x, void struct prmts, void struct d, double (*F)(double ,void struct,void struct)) { */
+/*   double k1, k2, k3, k4; */
+
+/*   k1 = d.dt*(*F)(x,prmts,d); */
+/*   k2 = d.dt*(*F)(x+k1/2, prmts,d); */
+/*   k3 = d.dt*(*F)(x+k2/2,prmts,d); */
+/*   k4 = d.dt*(*F)(x+k3,prmts,d); */
+/*   return (x + k1/6 + k2/3 + k3/3 + k4/6); */
+/* } */
