@@ -18,30 +18,30 @@ typedef struct {
 } t_qif;
 
 typedef struct {
-  int init_dist;		/* Type of initial distribution */
-  double vr;			/* Reseting potential */
-  double vp;			/* Peak potential */
+  int init_dist;		/* i: Type of initial distribution */
+  double vr;			/* r: Reseting potential */
+  double vp;			/* p: Peak potential */
 
-  double J;			/* J */
+  double J;			/*  */
   double DJ;			/* Dispersion of the J */
   int J_dist;			/* Type of distribution of J */
 
-  double eta;			/* External current */
-  double Deta;		        /* Dispersion of the external current */
-  int eta_dist;			/* Type of distribution of eta */
+  double eta;			/* h: External current */
+  double Deta;		        /* H: Width of the external current */
+  int eta_dist;			/* H ≠ 0 Type of distribution of eta */
 
-  int N;			/* Number of neurons */
-  double TT;			/* Total time of the simulation */
-  double dt;			/* Time step */
-  double dt2;			/* Auxiliary time step (not used) */
+  int N;			/* N: Number of neurons */
+  double TT;			/* T: Total time of the simulation */
+  double dt;			/* t: Time step */
+  double dt2;			/* f(t) Auxiliary time step (not used) */
 
-  int scan_mode;		/* Scan mode boolean */
+  int scan_mode;		/* S: Scan mode boolean */
   int scan;			/* counter */
   int scan_max;
 
-  double min;	                /* Minimum value of the variable to scan */
-  double max;			/* Maximum value of the variable to scan */
-  double step;			/* Increment of the value in each simulation */
+  double min;	                /* m: Minimum value of the variable to scan */
+  double max;			/* M: Maximum value of the variable to scan */
+  double step;			/* s: Increment of the value in each simulation */
   int MaxDim;			/* Maximum dimension of the raster plot */
   int disable_raster;
 
@@ -50,13 +50,13 @@ typedef struct {
   int voltdist;			/* Voltage distribution integer */
 
   int pert;
-  double pert_amplitude;        /* Amplitude of the perturbation QIF */
+  double pert_amplitude;        /* P: Amplitude of the perturbation QIF */
   double perturbation_FR;	/* FR *** Amplitude of the perturbation FR*/
 
   /* Related to the non-localized system */
-  int l;			/* Number of clusters (columns) */
-  double J0,J1,J2;		/* Amplitudes of the modes of the coupling function */
-  int ring;			/* Boolean to determine periodic boundaries */
+  int l;			/* l: Number of clusters (columns) */
+  double J0,J1,J2;		/* a,b,c: Amplitudes of the modes of the coupling function */
+  int ring;			/* R: Boolean to determine periodic boundaries */
 } t_data;
 
 
