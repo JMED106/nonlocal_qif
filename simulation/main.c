@@ -38,15 +38,15 @@ char mesg2[1024];
 /* Functions declaration. */
 void    Intro(t_data *d, int *Nscan, int *tr_TT);
 double *InitCond(double *p , int N, int dist_type,  double center, double gamma);
-void    InitialState(t_th * th, int type);
+void    InitialState(t_qif * th, int type);
 char   *DataDebug(t_data d, FILE *(*files)[]);
-double  MeanField(t_th *th, double dt, int type);
+double  MeanField(t_qif *th, double dt, int type);
 t_data *Var_update(t_data *d);
 char   *File_exists(char file_name[], double prmts);
 void    Data_Files(FILE *(*files)[], t_data d, int action);
 void    R_calc(t_data d,double *fr, double *voltage);
 void    R_script(t_data d, double x, double y);
-void    Perturbation(t_th **th, t_data d,int type);
+void    Perturbation(t_qif **th, t_data d,int type);
 
 /* === FUNCTION  main ====================
  * Description:  Program Body
@@ -86,14 +86,14 @@ int main(int argc, char **argv) {
 
   /* Parameters */
   t_data *d;
-  t_system *s;
-  s->l = 1000;
+  d->l = 1000;
 
   /* Results Variables */
   int Nscan;
 
   /* Dynamic variables (system variables) */
-  t_FR *FR;
+  t_FR **FR;
+  t_qif **neurn;
 
   FR = (t_FR*) calloc (FR,s->l*sizeof(t_FR)); /* We create our spatially extended systems (number of columns) */
   /* Each FR[i] represents a cluster of neurons, i.e. the columns */
@@ -111,14 +111,14 @@ int main(int argc, char **argv) {
   /*********************************/
   /* Program arguments assignation */
   /*********************************/
-  /* *data = Scan_Data(DATA_FILE,*d); */
-  /* d = data; */
+  *data = Scan_Data(DATA_FILE,*d);
+  d = data;
 
-  /* while((argc--) != 1) {	/\* Terminal arguments can be handled *\/ */
-  /*   *data = Arg(argv[argc], *d); */
-  /*   d = data; */
-  /*   if(argv[1][0] != '-') def = 0; */
-  /* } */
+  while((argc--) != 1) {	/* Terminal arguments can be handled */
+    *data = Arg(argv[argc], *d);
+    d = data;
+    if(argv[1][0] != '-') def = 0;
+  }
 
 #ifdef _OPENMP			/* Work is divided between the cores */
   int chunksize = d->N/numthreads;
@@ -198,7 +198,7 @@ double *InitCond(double *p, int N, int distr_type, double center, double gamma) 
  *   Variables:  none
  * ======================================= */
 
-void InitialState(t_th *th, int type) {
+void InitialState(t_qif *th, int type) {
   int i;
   double k = 0, h, v;
   gsl_rng *r;
@@ -247,7 +247,7 @@ void InitialState(t_th *th, int type) {
  *   Variables:  all th_i
  * ======================================= */
 
-double MeanField(t_th *th, double dt,int type) {
+double MeanField(t_qif *th, double dt,int type) {
   int i;
   double s = 0;
   double delta = 1.0/dt;
@@ -562,7 +562,7 @@ void R_script(t_data d, double x, double y) {
  *   Variables:  Voltages, amplitud
  * ======================================= */
 
-void Perturbation(t_th **th, t_data d,int type)  {
+void Perturbation(t_qif **th, t_data d,int type)  {
   int i;
   if(type == 0) 
     for(i=0 ;i<d.N ;i++ ) {
