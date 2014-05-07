@@ -23,10 +23,10 @@
  *   Variables:  Input data: vt,v0,N,dt,TT,th[]
  * ======================================= */
 
-t_th QIF(t_data d, t_th th) {
+t_qif QIF(t_data d, t_qif th) {
   /* counters */
 
-  double (* fptr) (double, t_th);
+  double (* fptr) (double, t_qif);
   fptr = qif;
 
   /* Quadratic Integrate and Fire Algorithm */
@@ -60,7 +60,7 @@ t_th QIF(t_data d, t_th th) {
   double v:   Potential  (x[0])
   ++++++++++++++++++++++++++++++++++++++*/
 
-double  qif(double x,t_th p) {  
+double  qif(double x,t_qif p) {  
   double I;
   I = p.J*p.r + p.eta - p.g*p.r*(x - p.V0);
   return (x*x + I);

@@ -17,8 +17,8 @@ extern char DATA_FILE[50];
 extern FILE *gp;
 
 /* Functions declaration. */
-t_th QIF(t_data, t_th );
-double qif (double ,t_th );
+t_qif QIF(t_data, t_qif );
+double qif (double ,t_qif );
 
 #endif
 
