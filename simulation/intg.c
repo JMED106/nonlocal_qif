@@ -68,17 +68,16 @@ double rk42(double x, t_qif prmts, t_data d, double (*F)(double ,t_qif,t_data)) 
 }
 
 
-/* /\* === FUNCTION  rk4_void ==================== */
-/*  * Description:  Runge-Kutta, order 4 */
-/*  *   Variables:  d, x, F */
-/*  * ======================================= *\/ */
+/* === FUNCTION  rk4_void ====================
+ * Description:  Runge-Kutta, order 4
+ *   Variables:  dt,x,F,parameters (generic)
+ * ======================================= */
 
-/* double rk42(double x, void struct prmts, void struct d, double (*F)(double ,void struct,void struct)) { */
-/*   double k1, k2, k3, k4; */
-
-/*   k1 = d.dt*(*F)(x,prmts,d); */
-/*   k2 = d.dt*(*F)(x+k1/2, prmts,d); */
-/*   k3 = d.dt*(*F)(x+k2/2,prmts,d); */
-/*   k4 = d.dt*(*F)(x+k3,prmts,d); */
-/*   return (x + k1/6 + k2/3 + k3/3 + k4/6); */
-/* } */
+double rk4_void(double x,double dt, double (*F)(double x,const void *prmts),const void *prmts) {
+  double k1, k2, k3, k4;
+  k1 = dt*(*F)(x,prmts);
+  k2 = dt*(*F)(x+k1/2, prmts);
+  k3 = dt*(*F)(x+k2/2,prmts);
+  k4 = dt*(*F)(x+k3,prmts);
+  return (x + k1/6 + k2/3 + k3/3 + k4/6);
+}
