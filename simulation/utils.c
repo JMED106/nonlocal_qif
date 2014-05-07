@@ -239,7 +239,7 @@ t_data Variables(char c, char *v, t_data d) {
     return data;
     break;
   case 'h':			/* External current (eta) */
-    data.h = atof(v);
+    data.eta = atof(v);
     return data;
     break;
   case 'i':			/* Initial condition (distribution) */

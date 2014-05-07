@@ -44,12 +44,12 @@ t_qif Theory(t_data d, t_qif th) {
 
 double  theory1(double x,t_qif p, t_data d) {  
   double I;
-  I = d.eta_sigma/(PI) + 2*p.rh2*p.vh2 + d.J_sigma*p.rh2 - d.g*p.rh2*(p.rh2*(PI) - d.v0_sigma);
+  I = d.Deta/(PI) + 2*p.rh2*p.vh2 + d.DJ*p.rh2 - d.g*p.rh2*(p.rh2*(PI) - d.DE);
   return (I);
 }
 
 double  theory2(double x,t_qif p, t_data d) {  
   double I;
-  I = d.eta + p.vh2*p.vh2 - p.rh2*p.rh2*(PI)*(PI) + d.J*p.rh2*(PI) - d.g*p.rh2*(PI)*(p.vh2 - d.v0);
+  I = d.eta + p.vh2*p.vh2 - p.rh2*p.rh2*(PI)*(PI) + d.J*p.rh2*(PI) - d.g*p.rh2*(PI)*(p.vh2 - d.E);
   return (I);
 }

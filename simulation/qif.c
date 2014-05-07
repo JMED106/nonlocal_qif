@@ -34,12 +34,10 @@ t_qif QIF(t_data d, t_qif th) {
    * taking into account the S(t) function and I_i   */
   th.tr = 0;
 
-  if((th.v = rk4(th.v,th,d.dt,fptr)) >= th.vp) {
+  if((th.v = rk4(th.v,th,d.dt,fptr)) >= d.vp) {
     th.tr = 1;
-    th.v = th.vr;
+    th.v = d.vr;
   }
-  /* if((th.th = rk4(th.th,th,dt,fptr)) >= PI) */
-  /*   th.th = -PI; */
 
   return th;
 }
@@ -62,6 +60,6 @@ t_qif QIF(t_data d, t_qif th) {
 
 double  qif(double x,t_qif p) {  
   double I;
-  I = p.J*p.r + p.eta - p.g*p.r*(x - p.V0);
+  I = p.J*p.r + p.eta - p.g*p.r*(x - p.E);
   return (x*x + I);
 }

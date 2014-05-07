@@ -38,9 +38,9 @@ char mesg2[1024];
 /* Functions declaration. */
 void    Intro(t_data *d, int *Nscan, int *tr_TT);
 double *InitCond(double *p , int N, int dist_type,  double center, double gamma);
-void    InitialState(t_qif * th, int type);
+void    InitialState(t_qif * th, t_data , int type);
 char   *DataDebug(t_data d, FILE *(*files)[]);
-double  MeanField(t_qif *th, double dt, int type);
+double  MeanField(t_qif *th, t_data , int type);
 t_data *Var_update(t_data *d);
 char   *File_exists(char file_name[], double prmts);
 void    Data_Files(FILE *(*files)[], t_data d, int action);
@@ -82,21 +82,28 @@ int main(int argc, char **argv) {
   FILE *file[8];
 
   /* +++++++++++++++++ Simulation variables ++++++++++++++++ */
-  int i;
+  int i,j;
+  int def;
 
   /* Parameters */
-  t_data *d;
+  t_data *d,*data;
+  d = malloc(sizeof(t_data));
+  data = malloc(sizeof(t_data));
   d->l = 1000;
 
   /* Results Variables */
   int Nscan;
 
   /* Dynamic variables (system variables) */
-  t_FR **FR;
-  t_qif **neurn;
+  t_FR *FR;
+  t_qif **neur;
 
-  FR = (t_FR*) calloc (FR,s->l*sizeof(t_FR)); /* We create our spatially extended systems (number of columns) */
+  FR = (t_FR*) calloc (d->l,sizeof(t_FR)); /* We create our spatially extended systems (number of columns) */
   /* Each FR[i] represents a cluster of neurons, i.e. the columns */
+  
+  neur = (t_qif**) calloc(d->l,sizeof(t_qif*));
+  for(j=0 ;j<d->l ;j++ ) 
+    neur[j] = (t_qif*) calloc (d->N,sizeof(t_qif));
   
   /* ++++++++++++++++++++++++++++++++++++++++++++++++++ */
   
@@ -134,7 +141,7 @@ int main(int argc, char **argv) {
   do {    
 
     do {			/* Tiempo */
-      for(i=0 ;i<s->l ;i++ ) {	/* Espacio */
+      for(i=0 ;i<d->l ;i++ ) {	/* Espacio */
 	/* Asignamos la posición en la que nos encontramos x_i = -PI + i*dx, dónde dx = 2PI/l */
 	
 	/* Ejecutamos la función de las eqs. FR */
@@ -198,7 +205,7 @@ double *InitCond(double *p, int N, int distr_type, double center, double gamma) 
  *   Variables:  none
  * ======================================= */
 
-void InitialState(t_qif *th, int type) {
+void InitialState(t_qif *th,t_data d, int type) {
   int i;
   double k = 0, h, v;
   gsl_rng *r;
@@ -213,27 +220,25 @@ void InitialState(t_qif *th, int type) {
    * v = tg(th/2). 
    * But th goes from 0 to PI 
    * v goes from v_reset to v_peak (finites) */
-  sprintf(mesg,"th[0].vp = %lf\tth[0].vr = %lf ",th[0].vp,th[0].vr );
-  DEBUG(mesg);
 
   switch(type) {
   case 0:			/* Uniform distribution between reset and peak values */
-    for(i=0 ;i < th[0].N ;i++ ) {
-      th[i].v = th[0].vr + (th[0].vp - th[0].vr)*gsl_rng_uniform(r);
+    for(i=0 ;i < d.N ;i++ ) {
+      th[i].v = d.vr + (d.vp - d.vr)*gsl_rng_uniform(r);
     }
     break;
   case 2:			/* Null distribution: constant 0 valued. */
-    for(i=0 ;i < th[0].N ;i++ ) {
+    for(i=0 ;i < d.N ;i++ ) {
       th[i].v = 0.0;
     }
     break;
   case 4:			/* Lorentzian distribution centered at 10 and width of 5 */
     h = 5;			/* (take into account that the distribution is cut at vr */
     v= 10;			/*  and vp) */
-    for(i=0 ;i < th[0].N ;i++ ) {
-      k = (2.0*(i+1) -th[0].N -1.0)/(th[0].N+1.0);
+    for(i=0 ;i < d.N ;i++ ) {
+      k = (2.0*(i+1) -d.N -1.0)/(d.N+1.0);
       th[i].v = v + h*tan((PI/2.0)*k);
-      if(fabs(th[i].v) > th[0].vp) th[i].v = v;
+      if(fabs(th[i].v) > d.vp) th[i].v = v;
     }
     break;
   default:
@@ -247,27 +252,20 @@ void InitialState(t_qif *th, int type) {
  *   Variables:  all th_i
  * ======================================= */
 
-double MeanField(t_qif *th, double dt,int type) {
+double MeanField(t_qif *th, t_data d,int type) {
   int i;
   double s = 0;
-  double delta = 1.0/dt;
-  double norm = (1.0*PI/th[0].N)*delta;
+  double delta = 1.0/d.dt;
+  double norm = (1.0*PI/d.N)*delta;
 
   if(type == 1) {
     th[0].global_s1 = 0;
-    for(i=0 ;i<th[0].N ;i++ ) {
+    for(i=0 ;i<d.N ;i++ ) {
       if(th[i].spike == 1)
 	s+= 1;
     }
     th[0].global_s1 = s;
-  } else if (type == 2) {
-    th[0].global_s2 = 0;
-    for(i=0 ;i<th[0].N ;i++ ) {
-      if(th[i].spike2 == 1)
-	s+= 1;
-    }
-    th[0].global_s2 = s;
-  }
+  } 
 
   s = s*norm;		/* Something wrong with couplinh (MF is not OK) */
   return s;
@@ -301,44 +299,44 @@ double MeanField(t_qif *th, double dt,int type) {
 t_data *Var_update(t_data *d) {
   t_data *d2;
   d2 = malloc(sizeof(*d2));
-  char *var_name[4] = {"J","eta","g","v0"};
+  char *var_name[4] = {"J","eta","g","E"};
   *d2 = *d;
   switch(d->variable) {
   case 1:			/* J */
     if(d->scan == 0)
-      d2->J = d->min_x;
+      d2->J = d->min;
     else
-      d2->J = d2->J + (d->dx);
+      d2->J = d2->J + (d->step);
     sprintf(mesg,"Variable [%s] changed from: %lf to %lf.",
 	    var_name[d->variable-1],d->J,d2->J);
     d2->var_value = d2->J;
     break;
   case 2:			/* eta */
     if(d->scan == 0)
-      d2->eta = d->min_x;
+      d2->eta = d->min;
     else
-      d2->eta = d2->eta + (d->dx);
+      d2->eta = d2->eta + (d->step);
     sprintf(mesg,"Variable [%s] changed from: %lf to %lf.",
 	    var_name[d->variable-1],d->eta,d2->eta);
     d2->var_value = d2->eta;
     break;
   case 3:			/* g */
     if(d->scan == 0)
-      d2->g = d->min_x;
+      d2->g = d->min;
     else
-      d2->g += d->dx;
+      d2->g += d->step;
     sprintf(mesg,"Variable [%s] changed from: %lf to %lf.",
 	    var_name[d->variable-1],d->g,d2->g);
     d2->var_value = d2->g;
     break;
-  case 4:			/* v0 */
+  case 4:			/* E */
     if(d->scan == 0)
-      d2->v0 = d->min_x;
+      d2->E = d->min;
     else
-      d2->v0 += d->dx;
+      d2->E += d->step;
     sprintf(mesg,"Variable [%s] changed from: %lf to %lf.",
-	    var_name[d->variable-1],d->v0,d2->v0);
-    d2->var_value = d2->v0;
+	    var_name[d->variable-1],d->E,d2->E);
+    d2->var_value = d2->E;
     break;
   default:
     d2->scan_mode = 0;
@@ -358,9 +356,9 @@ t_data *Var_update(t_data *d) {
 void Intro(t_data *d, int *Nscan, int *tr_TT) {
 
   int max_bits = 8*sizeof(unsigned long int); /* Architecture of the machine */
-  char *var_name[4] = {"J","eta","g","v0"};
+  char *var_name[4] = {"J","eta","g","E"};
   double tr, tr1 = 0, tr2 = 0;	/* Refractory period */
-  double dt, scandx = 0;
+  double dt, scanstep = 0;
 
 
   /** DEBUG ***********************************************/
@@ -377,9 +375,9 @@ void Intro(t_data *d, int *Nscan, int *tr_TT) {
     DEBUG(mesg);
   }
 
-  scandx = d->dx;
-  *Nscan = (int)ceil(1+(fabs(d->max_x - d->min_x)/((float)d->dx)));
-  if(d->max_x < d->min_x) d->dx = (-1.0)*scandx;
+  scanstep = d->step;
+  *Nscan = (int)ceil(1+(fabs(d->max - d->min)/((float)d->step)));
+  if(d->max < d->min) d->step = (-1.0)*scanstep;
 
   /* Time step setup */
   dt = d->dt;
@@ -420,12 +418,12 @@ char *DataDebug(t_data d,FILE *(*files)[]) {
 	  "\t Value of DJ (m)         = %5.2lf\n"
 	  "\t Value of eta (e)        = %5.2lf\n"
 	  "\t Value of Deta (d)       = %5.2lf\n"
-	  "\t Value of V0 (v)         = %5.2lf\n"
-	  "\t Value of DV0 (B)        = %5.2lf\n"
+	  "\t Value of E (v)         = %5.2lf\n"
+	  "\t Value of DE (B)        = %5.2lf\n"
 	  "\t Value of g (g)          = %5.2lf\n"
 	  "\t Total number of Neurons = %5d\n"
 	  "\t Simulation Time         = %5.2lf\n"
-	  "\t Time step               = %5.4lf\n", d.vr, d.vp, d.J,d.J_sigma,d.eta,d.eta_sigma,d.v0,d.v0_sigma,d.g, d.N, d.TT,d.dt);
+	  "\t Time step               = %5.4lf\n", d.vr, d.vp, d.J,d.DJ,d.eta,d.Deta,d.E,d.DE,d.g, d.N, d.TT,d.dt);
   fprintf((*files)[5] ,"%s",mesg);
   return mesg;
 }
@@ -475,8 +473,8 @@ void Data_Files(FILE *(*files)[], t_data d, int action) {
 	sprintf(cmd,"# g\t");
 	break;
       case 4:
-	sprintf(mesg,"./results/%s/fr_vs_V0.dat",d.file);
-	sprintf(cmd,"# V0\t");
+	sprintf(mesg,"./results/%s/fr_vs_E.dat",d.file);
+	sprintf(cmd,"# E\t");
 	break;
       default:
 	d.scan_mode = 0;
