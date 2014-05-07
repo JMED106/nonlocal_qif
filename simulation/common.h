@@ -15,6 +15,14 @@ typedef struct {
   int N;			/* Total number of oscillators (redundant) */
   double FR;
   int pert;
+
+  /* For g */
+  double E;
+  double g;
+  double J;
+
+  /* Provisionales (a borrar) */
+  double rh,rh2,vh,vh2;
 } t_qif;
 
 typedef struct {
@@ -30,6 +38,11 @@ typedef struct {
   double Deta;		        /* H: Width of the external current */
   int eta_dist;			/* H ≠ 0 Type of distribution of eta */
 
+  double g;
+  double E;		        /*  */
+  double DE;		        /*  */
+  int E_dist;			/*  */
+
   int N;			/* N: Number of neurons */
   double TT;			/* T: Total time of the simulation */
   double dt;			/* t: Time step */
@@ -38,6 +51,8 @@ typedef struct {
   int scan_mode;		/* S: Scan mode boolean */
   int scan;			/* counter */
   int scan_max;
+  int variable;
+  double var_value;
 
   double min;	                /* m: Minimum value of the variable to scan */
   double max;			/* M: Maximum value of the variable to scan */
@@ -69,7 +84,4 @@ typedef struct {
 #ifndef GSL_SIGN
 #define GSL_SIGN(x) ((x) >= 0 ? 1: -1)
 #endif
-
-double VarChange(t_th th);
-
 #endif
