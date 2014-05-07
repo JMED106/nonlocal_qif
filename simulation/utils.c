@@ -50,12 +50,6 @@ char Archivo(char archivo[], int s, FILE **fin)
  * ======================================= */
 
 void Gnuplot_Init(t_data d, char *day, char *hour) {
-  int option = 0;
-  char answ[100];
-  char pdf1[100], pdf2[100],pdf3[100];
-  double x, y;
-  x = sqrt(d.eta/2.0 + 0.5*sqrt(d.eta*d.eta + d.eta_sigma*d.eta_sigma));
-  y = d.eta_sigma/(2.0*x);
   
   /* Gnuplot Plotting (Experimental) */
   gnuplot_ctrl *g1, *g2, *g3, *g4;
@@ -64,55 +58,6 @@ void Gnuplot_Init(t_data d, char *day, char *hour) {
   g2 = gnuplot_init();
   g3 = gnuplot_init();
   g4 = gnuplot_init();
-
-  gnuplot_cmd(g2,"set title \"{/Symbol h} = %.2lf, {/Symbol s} = %.2lf\"",d.eta,d.eta_sigma);
-  gnuplot_cmd(g1, "plot \"./results/%s_%s_raster.dat\" w p lw 0 title \"{/Symbol h} = %.2lf\\ {/Symbol s} = %.2lf\"",day,hour,d.eta,d.eta_sigma);
-  gnuplot_cmd(g2, "plot \"./results/%s_%s_kuramoto.dat\" u 1:($1<7?1/0:$3) w l title \"r(t)\", \"\" u 1:($1<7?1/0:$2) w l title \"order\", \"\" u 1:($1<7?1/0:$4/pi) w l title \"{/Symbol Y}(t)/{/Symbol p} \" ",day,hour);
-  gnuplot_cmd(g3,"set title \"{/Symbol h} = %.2lf, {/Symbol s} = %.2lf\"",d.eta,d.eta_sigma);
-  gnuplot_cmd(g3,"set samples 10000");
-  gnuplot_cmd(g3,"set arrow from %lf,%lf to %lf,%lf nohead lc rgb \"blue\"\n",-y,0.0,-y,1.0/(PI*x));
-  gnuplot_cmd(g3,"plot ((%lf/pi)/(((%lf)+(x))**2+%lf**2)), \"./results/hist_simu.dat\";",x,y,x);
-
-  do{
-    printf("\nDo you want to export these plots to a PDF file?\n(Y/N)"); scanf("%s",answ);
-    fflush(stdout); fflush(stdin);
-    option = (((strcasecmp(answ,"y") == 0) || (strcasecmp(answ,"n") == 0))?1:0);
-  } while (option != 1);
-
-  printf("\n");
-  if((option = ((strcasecmp(answ,"y") == 0)?1:0) ) == 1) {
-    Create_Dir("plots");
-
-    sprintf(pdf1,"./plots/%s_%s_raster.pdf",day,hour);
-    sprintf(pdf2,"./plots/%s_%s_order.pdf",day,hour);
-    sprintf(pdf3,"./plots/%s_%s_hist.pdf",day,hour);
-
-    gnuplot_cmd(g1, "set encoding iso_8859_15");
-    gnuplot_cmd(g1, "set grid back");
-    gnuplot_cmd(g1, "set terminal postscript eps enhanced color");
-    gnuplot_cmd(g1, "set output \"| epstopdf --filter --outfile=%s\"",pdf1);
-
-    gnuplot_cmd(g2, "set encoding iso_8859_15");
-    gnuplot_cmd(g2, "set grid back");
-    gnuplot_cmd(g2, "set terminal postscript eps enhanced color");
-    gnuplot_cmd(g2, "set output \"| epstopdf --filter --outfile=%s\"",pdf2);
-
-    gnuplot_cmd(g3, "set encoding iso_8859_15");
-    gnuplot_cmd(g3, "set grid back");
-    gnuplot_cmd(g3, "set terminal postscript eps enhanced color");
-    gnuplot_cmd(g3, "set output \"| epstopdf --filter --outfile=%s\"",pdf3);
-
-    gnuplot_cmd(g1, "plot \"./results/%s_%s_raster.dat\" w p pt 0 title \"{/Symbol h} = %.2lf\\ {/Symbol s} = %.2lf\"",day,hour,d.eta,d.eta_sigma);
-    gnuplot_cmd(g2, "plot \"./results/%s_%s_kuramoto.dat\" u 1:($1<7?1/0:$3) w l title \"r(t)\", \"\" u 1:($1<7?1/0:$2) w l title \"order\", \"\" u 1:($1<7?1/0:$4/pi) w l title \"{/Symbol Y}(t)/{/Symbol p}\" ",day,hour);
-
-    gnuplot_cmd(g3,"plot ((%lf/pi)/((%lf+x)**2+%lf**2)) title \"Theory\", \"./results/hist_simu.dat\" title \"Simulation\";",x,y,x);
-  }
-  fflush(stdin); fflush(stdout);
-
-  sprintf(answ,"cp ./results/hist_simu.dat ./results/%s_%s_hist_simu.dat",day,hour);
-  system(answ);
-  sprintf(answ,"cp ./results/volt.dat ./results/%s_%s_voltdist.dat",day,hour);
-  system(answ);
     
   gnuplot_close(g1);
   gnuplot_close(g2);
@@ -265,115 +210,215 @@ t_data Variables(char c, char *v, t_data d) {
   data = d;
 
   switch(c) {
-    case 'i':			/* Initial configuration state */
-      data.init_dist = atoi(v);
-      return data;
-      break;
-    case 'r':			/* Reseting Potential V_res */
-      data.vr = atof(v);
-      return data;
-      break;
-    case 'p':			/* Peak Potential V_peak */
-      data.vp = atof(v);
-      return data;
-      break;
-    case 'j':			/* Value of J0 */
-      data.J = atof(v);
-      return data;
-      break;
-    case 'J':			/* J_dist {0,1} */
-      data.J_dist = atoi(v);
-      return data;
-      break;
-    case 'm':			/* J_gamma */
-      data.J_sigma = atof(v);
-      return data;
-      break;
-    case 'N':			/* Total number of neurons */
-      data.N = atoi(v);
-      return data;
-      break;
-    case 'T':			/* Simulation time */
-      data.TT = atof(v);
-      return data;
-      break;
-    case 't':			/* Time step */
-      data.dt = atof(v);
-      return data;
-      break;
-    case 'e':			/* Value of Eta0 */
-      data.eta = atof(v);
-      return data;
-      break;
-    case 'E':			/* eta_dist */
-      data.eta_dist = atoi(v);
-      return data;
-      break;
-    case 'd':			/* eta_gamma */
-      data.eta_sigma = atof(v);
-      return data;
-      break;
-    case 'g':			/* Value of g0 */
-      data.g = atof(v);
-      return data;
-      break;
-    case 'v':			/* Value of V0 */
-      data.v0 = atof(v);
-      return data;
-      break;
-    case 'V':			/* V0_dist */
-      data.v0_dist = atoi(v);
-      return data;
-      break;
-    case 'B':			/* V0_gamma */
-      data.v0_sigma = atof(v);
-      return data;
-      break;
-    case 's':			/* Scan mode: ... */
-      data.scan_mode = atoi(v);
-      return data;
-      break;
-    case 'z':
-      data.variable = atoi(v);	/* Variable to scan */
-      return data;
-      break;
-    case 'x':			/* Minimum value */
-      data.min_x = atof(v);
-      return data;
-      break;
-    case 'Z':			/* Maximum value */
-      data.max_x = atof(v);
-      return data;
-      break;
-    case 'X':			/* Increment */
-      data.dx = atof(v);
-      return data;
-      break;	
-    case 'f':			/* Amplitude of the perturbation */
-      data.pert_amplitude = atof(v);
-      return data;
-      break;
-    case 'P':			/* FR *** Amplitude of the perturbation of FR */
-      data.perturbation_FR = atoi(v);
-      return data;
-      break;
-    case 'R':			/* OPTIONAL 1 */
-      /* Assing something */
-      return data;
-      break;
-    case 'l':			/* OPTIONAL 2 */
-      /* Assing something */
-      return data;
-      break;
-    case 'G':			/* OPTIONAL 3 */
-      /* Assing something */
-      return data;
-      break;
-    case 'b':			/* OPTIONAL 4 */
-      /* Assing something */
-      return data;
-      break;
-    default:
-      ARG_ERROR;
+  case 'a':			/* (Provisional) J0 */
+    data.J0 = atof(v);
+    return data;
+    break;
+  case 'b':
+    data.J1 = atof(v);		/* (Provisional) J1 */
+    return data;
+    break;
+  case 'c':
+    data.J2 = atof(v);		/* (Provisional) J2 */
+    return data;
+    break;
+  case 'd':
+    /* assignment */
+    return data;
+    break;
+  case 'e':
+    /* assignment */
+    return data;
+    break;
+  case 'f':
+    /* assignment */
+    return data;
+    break;
+  case 'g':
+    /* assignment */
+    return data;
+    break;
+  case 'h':			/* External current (eta) */
+    data.h = atof(v);
+    return data;
+    break;
+  case 'i':			/* Initial condition (distribution) */
+    data.init_dist = atoi(v);
+    return data;
+    break;
+  case 'j':
+    /* assignment */
+    return data;
+    break;
+  case 'k':
+    /* assignment */
+    return data;
+    break;
+  case 'l':			/* Number of clusters (size) */
+    data.l = atoi(v);
+    return data;
+    break;
+  case 'm':			/* Minimum value of the variable to scan */
+    data.min = atof(v);
+    return data;
+    break;
+  case 'n':
+    /* assignment */
+    return data;
+    break;
+  case 'o':
+    /* assignment */
+    return data;
+    break;
+  case 'p':			/* Peak potential QIF */
+    data.vp = atof(v);
+    return data;
+    break;
+  case 'q':
+    /* assignment */
+    return data;
+    break;
+  case 'r':			/* Reset potential QIF */
+    data.vr = atof(v);
+    return data;
+    break;
+  case 's':			/* Step of the scanned variable */
+    data.step = atof(v);
+    return data;
+    break;
+  case 't':			/* Time step of the simulation */
+    data.dt = atof(v);
+    return data;
+    break;
+  case 'u':		       
+    /* assignment */
+    return data;
+    break;
+  case 'v':
+    /* assignment */
+    return data;
+    break;
+  case 'w':
+    /* assignment */
+    return data;
+    break;
+  case 'x':
+    /* assignment */
+    return data;
+    break;
+  case 'y':
+    /* assignment */
+    return data;
+    break;
+  case 'z':
+    /* assignment */
+    return data;
+    break;
+  case 'A':
+    /* assignment */
+    return data;
+    break;
+  case 'B':
+    /* assignment */
+    return data;
+    break;
+  case 'C':
+    /* assignment */
+    return data;
+    break;
+  case 'D':
+    /* assignment */
+    return data;
+    break;
+  case 'E':
+    /* assignment */
+    return data;
+    break;
+  case 'F':
+    /* assignment */
+    return data;
+    break;
+  case 'G':
+    /* assignment */
+    return data;
+    break;
+  case 'H':			/* Delta-Eta (if H ≠ 0 distribution is enabled) */
+    data.Deta = atof(v);
+    return data;
+    break;
+  case 'I':
+    /* assignment */
+    return data;
+    break;
+  case 'J':
+    /* assignment */
+    return data;
+    break;
+  case 'K':
+    /* assignment */
+    return data;
+    break;
+  case 'L':
+    /* assignment */
+    return data;
+    break;
+  case 'M':			/* Maximum value of the scnanned variable */
+    data.max = atof(v);
+    return data;
+    break;
+  case 'N':			/* Number of neurons QIF */
+    data.N = atoi(v);
+    return data;
+    break;
+  case 'O':
+    /* assignment */
+    return data;
+    break;
+  case 'P':			/* Amplitude of the perturbation QIF */
+    data.pert_amplitude = atof(v);
+    return data;
+    break;
+  case 'Q':
+    /* assignment */
+    return data;
+    break;
+  case 'R':			/* Boolean: periodic boundaries */
+    data.ring = atoi(v);
+    return data;
+    break;
+  case 'S':			/* Scan mode boolean */
+    data.scan_mode = atoi(v);
+    return data;
+    break;
+  case 'T':			/* Total time of the simulation */
+    data.TT = atof(v);
+    return data;
+    break;
+  case 'U':
+    /* assignment */
+    return data;
+    break;
+  case 'V':
+    /* assignment */
+    return data;
+    break;
+  case 'W':
+    /* assignment */
+    return data;
+    break;
+  case 'X':
+    /* assignment */
+    return data;
+    break;
+  case 'Y':
+    /* assignment */
+    return data;
+    break;
+  case 'Z':
+    /* assignment */
+    return data;
+    break;
+  default:
+    ARG_ERROR;
   }
 }
