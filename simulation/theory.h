@@ -17,8 +17,8 @@ extern char DATA_FILE[50];
 extern FILE *gp;
 
 /* Functions declaration. */
-t_th Theory(t_data, t_th );
-double theory1(double ,t_th ,t_data);
-double theory2(double ,t_th ,t_data);
+t_qif Theory(t_data, t_qif );
+double theory1(double ,t_qif ,t_data);
+double theory2(double ,t_qif ,t_data);
 
 #endif

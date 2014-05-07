@@ -23,10 +23,10 @@
  *   Variables:  Input data: vt,v0,N,dt,TT,th[]
  * ======================================= */
 
-t_th Theory(t_data d, t_th th) {
+t_qif Theory(t_data d, t_qif th) {
   /* counters */
 
-  double (* fptr) (double, t_th, t_data);
+  double (* fptr) (double, t_qif, t_data);
   fptr = theory1;
   th.rh2 = th.rh;
   th.vh2 = th.vh;
@@ -42,13 +42,13 @@ t_th Theory(t_data d, t_th th) {
 
   ++++++++++++++++++++++++++++++++++++++*/
 
-double  theory1(double x,t_th p, t_data d) {  
+double  theory1(double x,t_qif p, t_data d) {  
   double I;
   I = d.eta_sigma/(PI) + 2*p.rh2*p.vh2 + d.J_sigma*p.rh2 - d.g*p.rh2*(p.rh2*(PI) - d.v0_sigma);
   return (I);
 }
 
-double  theory2(double x,t_th p, t_data d) {  
+double  theory2(double x,t_qif p, t_data d) {  
   double I;
   I = d.eta + p.vh2*p.vh2 - p.rh2*p.rh2*(PI)*(PI) + d.J*p.rh2*(PI) - d.g*p.rh2*(PI)*(p.vh2 - d.v0);
   return (I);
