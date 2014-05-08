@@ -74,11 +74,18 @@ typedef struct {
   int ring;			/* R: Boolean to determine periodic boundaries */
 } t_data;
 
-
 typedef struct {
+  double r;
+  struct  t_FR **FR;
+} str_pr;
+
+struct t_FR {
   double r, r2;
   double v, v2;
-} t_FR;
+} ;
+
+typedef struct t_FR T_FR;
+  
 
 
 #ifndef GSL_SIGN
