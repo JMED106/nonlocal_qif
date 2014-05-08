@@ -2,30 +2,6 @@
 #define __COMMON__
 
 typedef struct {
-  double v;
-
-  double eta;
-
-  double r;			/* Firing Rate saved in each oscillator */
-  double spike;			/* Has the oscillator spiked? */
-  int tr;			/* How many steps ago has the oscillator spiked? */
-  int total_spikes;	        /* Total number of spike of this oscillator */
-  int global_s1;
-
-  int N;			/* Total number of oscillators (redundant) */
-  double FR;
-  int pert;
-
-  /* For g */
-  double E;
-  double g;
-  double J;
-
-  /* Provisionales (a borrar) */
-  double rh,rh2,vh,vh2;
-} t_qif;
-
-typedef struct {
   int init_dist;		/* i: Type of initial distribution */
   double vr;			/* r: Reseting potential */
   double vp;			/* p: Peak potential */
@@ -72,6 +48,8 @@ typedef struct {
   int l;			/* l: Number of clusters (columns) */
   double J0,J1,J2;		/* a,b,c: Amplitudes of the modes of the coupling function */
   int ring;			/* R: Boolean to determine periodic boundaries */
+  struct  t_FR **FR;		/* We will use this object to carry info about r and v */
+  struct T_qif ***QIF;
 } t_data;
 
 typedef struct {
@@ -79,12 +57,37 @@ typedef struct {
   struct  t_FR **FR;
 } str_pr;
 
+struct T_qif {
+  double v;
+
+  double eta;
+
+  double r;			/* Firing Rate saved in each oscillator */
+  double spike;			/* Has the oscillator spiked? */
+  int tr;			/* How many steps ago has the oscillator spiked? */
+  int total_spikes;	        /* Total number of spike of this oscillator */
+  int global_s1;
+
+  int N;			/* Total number of oscillators (redundant) */
+  double FR;
+  int pert;
+
+  /* For g */
+  double E;
+  double g;
+  double J;
+
+  /* Provisionales (a borrar) */
+  double rh,rh2,vh,vh2;
+};
+
 struct t_FR {
   double r, r2;
   double v, v2;
 } ;
 
 typedef struct t_FR T_FR;
+typedef struct T_qif t_qif;
   
 
 
