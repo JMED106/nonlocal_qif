@@ -30,6 +30,7 @@ char mesg2[1024];
 
 /* Additional libraries (custom libraries) */
 #include "utils.h"
+#include "file.h"
 #include "qif.h"
 #include "theory.h"
 #include "common.h"
@@ -84,12 +85,12 @@ int main(int argc, char **argv) {
   /* +++++++++++++++++ Simulation variables ++++++++++++++++ */
   int i,j;
   int def;
+  int time_correction;
 
   /* Parameters */
   t_data *d,*data;
   d = malloc(sizeof(t_data));
   data = malloc(sizeof(t_data));
-  d->l = 1000;
 
   /* Results Variables */
   int Nscan;
@@ -98,33 +99,6 @@ int main(int argc, char **argv) {
   t_qif **neur;
   T_FR *FR;
 
-  FR = (T_FR*) calloc (d->l,sizeof(T_FR)); /* We create our spatially extended systems (number of columns) */
-  /* Each FR[i] represents a cluster of neurons, i.e. the columns */
-  FR[0].r = 0.2;
-  FR[1].r = 0.6;
-  neur = (t_qif**) calloc(d->l,sizeof(t_qif*));
-  for(j=0 ;j<d->l ;j++ ) 
-    neur[j] = (t_qif*) calloc (d->N,sizeof(t_qif));
-
-  printf("\nFR[0].r = %lf;",FR[0].r);
-
-  d->FR = &FR;
-  d->QIF = &neur;
-  printf("\n*((d->FR))->r = %lf;",(*(d->FR))->r);
-  (*(d->FR))->r = 0.3;
-  printf("\n(*(d->FR))->r = %lf;",(*(d->FR))->r);
-
-
-  printf("\nFR[0].r = %lf;",FR[0].r);
-  printf("\nFR[1].r = %lf;",FR[1].r);
-  ESPERA
-  printf("\n(*(d->FR))[0].r = %lf;",(*(d->FR))[0].r);
-  ESPERA
-  printf("\n(*(d->FR))[1].r = %lf;",(*(d->FR))[1].r);
-  (*(d->FR)+1)->r = 0.7;
-  printf("\n(*(d->FR))[1].r = %lf;",(*(d->FR))[1].r);
-  printf("\nFR[1].r = %lf;",FR[1].r);
-  ESPERA
   
   /* ++++++++++++++++++++++++++++++++++++++++++++++++++ */
   
@@ -148,20 +122,38 @@ int main(int argc, char **argv) {
     if(argv[1][0] != '-') def = 0;
   }
 
+  FR = (T_FR*) calloc (d->l,sizeof(T_FR)); /* We create our spatially extended systems (number of columns) */
+  /* Each FR[i] represents a cluster of neurons, i.e. the columns */
+
+  neur = (t_qif**) calloc(d->l,sizeof(t_qif*));
+  for(j=0 ;j<d->l ;j++ ) 
+    neur[j] = (t_qif*) calloc (d->N,sizeof(t_qif));
+
+  d->FR = &FR;
+  d->QIF = &neur;
+
+
 #ifdef _OPENMP			/* Work is divided between the cores */
-  int chunksize = d->N/numthreads;
-  if(chunksize > 10) chunksize = 10;
+  int chunksize = d->l/numthreads;
+  if(chunksize > 5) chunksize = 5;
 #endif
 
   /* Initial tunning: step size, and scanning issues */
-
+  Intro(d,&Nscan,&time_correction);
 
   /**********************************/
   /* New simulations can start here */
   /**********************************/
   do {    
+    if(d->scan_mode >= 1) 
+      d = Var_update(d);
+    Data_Files(&file,*d,0);
+    Data_Files(&file,*d,4);
+    if(def == 0)		/* Debug message: data display */
+      DEBUG2(DataDebug(*d,&file));
 
     do {			/* Tiempo */
+#pragma omp parallel for schedule(dynamic,chunksize)
       for(i=0 ;i<d->l ;i++ ) {	/* Espacio */
 	/* Asignamos la posición en la que nos encontramos x_i = -PI + i*dx, dónde dx = 2PI/l */
 	
