@@ -95,11 +95,8 @@ int main(int argc, char **argv) {
   int Nscan;
 
   /* Dynamic variables (system variables) */
-  str_pr *prueba;
   t_qif **neur;
   T_FR *FR;
-
-  prueba = malloc(sizeof(str_pr));
 
   FR = (T_FR*) calloc (d->l,sizeof(T_FR)); /* We create our spatially extended systems (number of columns) */
   /* Each FR[i] represents a cluster of neurons, i.e. the columns */
@@ -108,22 +105,24 @@ int main(int argc, char **argv) {
   neur = (t_qif**) calloc(d->l,sizeof(t_qif*));
   for(j=0 ;j<d->l ;j++ ) 
     neur[j] = (t_qif*) calloc (d->N,sizeof(t_qif));
+
   printf("\nFR[0].r = %lf;",FR[0].r);
-  prueba->r = 0.2;
-  prueba->FR = &FR;
-  printf("\n*((prueba->FR))->r = %lf;",(*(prueba->FR))->r);
-  (*(prueba->FR))->r = 0.3;
-  printf("\n(*(prueba->FR))->r = %lf;",(*(prueba->FR))->r);
+
+  d->FR = &FR;
+  d->QIF = &neur;
+  printf("\n*((d->FR))->r = %lf;",(*(d->FR))->r);
+  (*(d->FR))->r = 0.3;
+  printf("\n(*(d->FR))->r = %lf;",(*(d->FR))->r);
 
 
   printf("\nFR[0].r = %lf;",FR[0].r);
   printf("\nFR[1].r = %lf;",FR[1].r);
   ESPERA
-  printf("\n(*(prueba->FR))[0].r = %lf;",(*(prueba->FR))[0].r);
+  printf("\n(*(d->FR))[0].r = %lf;",(*(d->FR))[0].r);
   ESPERA
-  printf("\n(*(prueba->FR))[1].r = %lf;",(*(prueba->FR))[1].r);
-  (*(prueba->FR)+1)->r = 0.7;
-  printf("\n(*(prueba->FR))[1].r = %lf;",(*(prueba->FR))[1].r);
+  printf("\n(*(d->FR))[1].r = %lf;",(*(d->FR))[1].r);
+  (*(d->FR)+1)->r = 0.7;
+  printf("\n(*(d->FR))[1].r = %lf;",(*(d->FR))[1].r);
   printf("\nFR[1].r = %lf;",FR[1].r);
   ESPERA
   
