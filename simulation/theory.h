@@ -17,8 +17,13 @@ extern char DATA_FILE[50];
 extern FILE *gp;
 
 /* Functions declaration. */
-t_qif Theory(t_data, t_qif );
+T_FR Theory(t_data *, T_FR );
 double theory1(double ,t_qif ,t_data);
 double theory2(double ,t_qif ,t_data);
+double Coupling(t_data d, T_FR fr);
+double J_x(t_data d,double x, double x_prima);
+double rdot(double x, t_data *d);
+double vdot(double x, t_data *d);
+
 
 #endif

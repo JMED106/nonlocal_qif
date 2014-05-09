@@ -23,24 +23,48 @@
  *   Variables:  Input data: vt,v0,N,dt,TT,th[]
  * ======================================= */
 
-t_qif Theory(t_data d, t_qif th) {
+T_FR Theory(t_data *d, T_FR fr) {
   /* counters */
 
-  double (* fptr) (double, t_qif, t_data);
-  fptr = theory1;
-  th.rh2 = th.rh;
-  th.vh2 = th.vh;
-  th.rh = rk42(th.rh2,th,d,fptr);
+  d->rx = fr.r;
+  d->vx = fr.v;
 
-  fptr = theory2;
-  th.vh = rk42(th.vh2,th,d,fptr);
-  return th;
+  /* Calculamos la integral mediante una suma de Riemann */
+  fr.S = Coupling(*d,fr);
+  d->S = fr.S;
+
+  fr.r = rk4_void(d->rx,d->dt,rdot,d);
+  fr.v = rk4_void(d->vx,d->dt,vdot,d);
+
+  return fr;
 }
 
+double Coupling(t_data d, T_FR fr) {
+  int i;
+  double s = 0;
+  double norm = 2*PI;
+  for(i = 0; i < d.l; i++) 
+    s += J_x(d,fr.x,(*(d.FR))[i].x)*(*(d.FR))[i].r;
+  /* sprintf(mesg,"La suma para fr.x: %lf da %lf ",fr.x,s ); */
+  /* DEBUG(mesg); */
+  return s/norm;		/* Falta la normalización... */
+}
 
+double J_x(t_data d,double x, double x_prima) {
+  return (d.J0 + d.J1*cos(x_prima-x));
+}
+  
 /*++++++++++++++++++++++++++++++++++++++
 
   ++++++++++++++++++++++++++++++++++++++*/
+
+double rdot(double x, t_data *d) {
+  return d->Deta/PI + 2.0*d->vx*x;
+}
+
+double vdot(double x, t_data *d) {
+  return d->eta + x*x-d->rx*d->rx*PI*PI + d->S;
+}
 
 double  theory1(double x,t_qif p, t_data d) {  
   double I;
