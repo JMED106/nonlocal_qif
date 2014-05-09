@@ -310,8 +310,8 @@ t_data Variables(char c, char *v, t_data d) {
     /* assignment */
     return data;
     break;
-  case 'z':
-    /* assignment */
+  case 'z':			/* Variable to scan */
+    data.variable = atoi(v);
     return data;
     break;
   case 'A':

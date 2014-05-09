@@ -48,8 +48,29 @@ typedef struct {
   int l;			/* l: Number of clusters (columns) */
   double J0,J1,J2;		/* a,b,c: Amplitudes of the modes of the coupling function */
   int ring;			/* R: Boolean to determine periodic boundaries */
+  double dx;			/* Space interval */
+  double DX;			/* Size of the system */
+
+  /* File names */
+  char file_parameters[256];
+  char file_rvJ_FR[256];
+  char file_rt_FR[256];
+  char file_vt_FR[256];
+  char file_rvJ_QIF[256];
+  char file_rt_QIF[256];
+  char file_vt_QIF[256];
+  char file_rvp_FR[256];
+  char file_rvp_QIF[256];
+
+  char **ftime; char **tmodes;
+  char **fscan; char **smodes;
   struct  t_FR **FR;		/* We will use this object to carry info about r and v */
   struct T_qif ***QIF;
+  
+  double rx;
+  double vx;
+  
+  double S;
 } t_data;
 
 typedef struct {
@@ -59,6 +80,7 @@ typedef struct {
 
 struct T_qif {
   double v;
+  double x;
 
   double eta;
 
@@ -84,6 +106,8 @@ struct T_qif {
 struct t_FR {
   double r, r2;
   double v, v2;
+  double S;			/* Suma de Riemann (integral) */
+  double x;
 } ;
 
 typedef struct t_FR T_FR;
