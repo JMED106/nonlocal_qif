@@ -40,11 +40,10 @@ char mesg2[1024];
 void    Intro(t_data *d, int *Nscan, int *tr_TT);
 double *InitCond(double *p , int N, int dist_type,  double center, double gamma);
 void    InitialState(t_qif * th, t_data , int type);
-char   *DataDebug(t_data d, FILE *(*files)[]);
+char   *DataDebug(t_data d, FILE **file);
 double  MeanField(t_qif *th, t_data , int type);
 t_data *Var_update(t_data *d);
-char   *File_exists(char file_name[], double prmts);
-void    Data_Files(FILE *(*files)[], t_data d, int action);
+void    Data_Files(t_data *d);
 void    R_calc(t_data d,double *fr, double *voltage);
 void    R_script(t_data d, double x, double y);
 void    Perturbation(t_qif **th, t_data d,int type);
@@ -64,7 +63,7 @@ int main(int argc, char **argv) {
 
   /* +++++++++++++++++ External Things ++++++++++++++++++++++ */
 
-  time_t t;   struct tm *tm;  t = time(NULL); tm = localtime(&t);
+  time_t ti;   struct tm *tm;  ti = time(NULL); tm = localtime(&ti);
   if((argc >1) && (argv[1][1] == 'd')) {debug = 1; d_level = 1;} /* Initial debugging */
 
   srand(time(NULL));
@@ -80,10 +79,14 @@ int main(int argc, char **argv) {
 
   /* Data store */
   Create_Dir("results");
-  FILE *file[8];
+  FILE *file[6];
+  FILE *fileS[4];
+  FILE *volt;
+
+  t_file FileT,FileS;
 
   /* +++++++++++++++++ Simulation variables ++++++++++++++++ */
-  int i,j;
+  int i,j,t, total_t;
   int def;
   int time_correction;
 
@@ -98,7 +101,7 @@ int main(int argc, char **argv) {
   /* Dynamic variables (system variables) */
   t_qif **neur;
   T_FR *FR;
-
+  double time, x;
   
   /* ++++++++++++++++++++++++++++++++++++++++++++++++++ */
   
@@ -107,8 +110,7 @@ int main(int argc, char **argv) {
   sprintf(mesg2,"results/%s",d->file);
   Create_Dir(mesg2);
   Create_Dir("temp");
-  sprintf(mesg2,"cp volt_avg.R ./temp");
-  system(mesg2);
+  sprintf(mesg2,"cp volt_avg.R ./temp"); system(mesg2);
 
   /*********************************/
   /* Program arguments assignation */
@@ -132,7 +134,6 @@ int main(int argc, char **argv) {
   d->FR = &FR;
   d->QIF = &neur;
 
-
 #ifdef _OPENMP			/* Work is divided between the cores */
   int chunksize = d->l/numthreads;
   if(chunksize > 5) chunksize = 5;
@@ -140,6 +141,10 @@ int main(int argc, char **argv) {
 
   /* Initial tunning: step size, and scanning issues */
   Intro(d,&Nscan,&time_correction);
+  total_t = (int)((float)d->TT/d->dt);
+  d->DX = 2.0*PI;
+  d->dx = d->DX/(d->l*1.0);
+
 
   /**********************************/
   /* New simulations can start here */
@@ -147,20 +152,53 @@ int main(int argc, char **argv) {
   do {    
     if(d->scan_mode >= 1) 
       d = Var_update(d);
-    Data_Files(&file,*d,0);
-    Data_Files(&file,*d,4);
+    Data_Files(d);		/* Paths to the results' files */
     if(def == 0)		/* Debug message: data display */
-      DEBUG2(DataDebug(*d,&file));
+      DEBUG2(DataDebug(*d,&(file[0])));
 
+    FileT = LoadFileLibrary(d->ftime, d->tmodes);
+    FileT.multiopen(&file,&FileT);
+
+    /* Reset counters */
+    t = 0;
+    time = t*d->dt;
+    /* Run */
     do {			/* Tiempo */
+      if(t%(total_t/10) == 0) { /* Control point */
+	sprintf(mesg,"%d%% ",(int)(t*100.0/total_t));
+	DEBUG(mesg);
+      }
 #pragma omp parallel for schedule(dynamic,chunksize)
       for(i=0 ;i<d->l ;i++ ) {	/* Espacio */
 	/* Asignamos la posición en la que nos encontramos x_i = -PI + i*dx, dónde dx = 2PI/l */
-	
+	x = -PI + i*d->dx;
+	FR[i].x = x;
 	/* Ejecutamos la función de las eqs. FR */
+	FR[i] = Theory(d,FR[i]);
 	
       }
-    } while(1);	              /* Paso temporal (se puede hacer de la misma manera que en el QIF */
+      fprintf(file[1],"%lf\t",time);
+      fprintf(file[2],"%lf\t",time);
+      for(i=0 ;i<d->l ;i++ ) {
+	fprintf(file[1],"%lf\t",FR[i].r);
+	fprintf(file[2],"%lf\t",FR[i].v);
+      }
+      fprintf(file[1],"\n");
+      fprintf(file[2],"\n");
+
+      t++;
+      time = t*d->dt;
+    } while(time < d->TT);	/* Paso temporal (se puede hacer de la misma manera que en el QIF */
+    sprintf(mesg,"%d%% ",(int)(t*100.0/total_t));
+    DEBUG(mesg);
+
+    for(i=0 ;i<d->l ;i++ ) {
+      x = -PI + i*d->dx;
+      fprintf(file[0],"%lf\t%lf\t%lf\t%lf\n",x,FR[i].r,FR[i].v,J_x(*d,x,0));
+    }
+	
+    FileT.closeall(&file,&FileT);
+    d->scan++;
   } while (d->scan < Nscan);  /* Simulation ends here */
 
   system("rm -r ./temp");
@@ -284,26 +322,6 @@ double MeanField(t_qif *th, t_data d,int type) {
   return s;
 }
 
-/* === FUNCTION  File ====================
- * Description:  Check whether a file exists
- *   Variables:  file_name, prmts
- * ======================================= */
-
- char *File_exists(char file_name[], double prmts) {
-   int exist = 0;
-   int count = 0;
-   char *cmd;
-   cmd = (char*) malloc(100*sizeof(char));
-   do {
-     count++;
-     sprintf(cmd,"ls ./%s/%s_sigma-%.4lf_%d.dat",file_name,file_name,prmts,count);
-     exist = system(cmd);
-   } while(exist == 0);
-   sprintf(cmd, "./%s/%s_sigma-%.4lf_%d.dat",file_name,file_name,prmts,count);
-   return cmd;
- }
-
-
 /* === FUNCTION  data ====================
  * Description:  Updates target variable in scan mode
  *   Variables:  Data structure
@@ -391,6 +409,7 @@ void Intro(t_data *d, int *Nscan, int *tr_TT) {
   scanstep = d->step;
   *Nscan = (int)ceil(1+(fabs(d->max - d->min)/((float)d->step)));
   if(d->max < d->min) d->step = (-1.0)*scanstep;
+  if(d->scan_mode == 0) *Nscan = 0;
 
   /* Time step setup */
   dt = d->dt;
@@ -422,7 +441,8 @@ void Intro(t_data *d, int *Nscan, int *tr_TT) {
  *   Variables:  data structure
  * ======================================= */
 
-char *DataDebug(t_data d,FILE *(*files)[]) {
+char *DataDebug(t_data d,FILE **file) {
+  OpenFile(file,d.file_parameters,"w");  
   sprintf(mesg,"\nCustom parameters\n"
 	  "-----------------\n"
 	  "\t Reseting potential (r ) = %5.2lf\n"
@@ -431,93 +451,53 @@ char *DataDebug(t_data d,FILE *(*files)[]) {
 	  "\t Value of DJ (m)         = %5.2lf\n"
 	  "\t Value of eta (e)        = %5.2lf\n"
 	  "\t Value of Deta (d)       = %5.2lf\n"
-	  "\t Value of E (v)         = %5.2lf\n"
-	  "\t Value of DE (B)        = %5.2lf\n"
+	  "\t Value of E (v)          = %5.2lf\n"
+	  "\t Value of DE (B)         = %5.2lf\n"
 	  "\t Value of g (g)          = %5.2lf\n"
 	  "\t Total number of Neurons = %5d\n"
 	  "\t Simulation Time         = %5.2lf\n"
 	  "\t Time step               = %5.4lf\n", d.vr, d.vp, d.J,d.DJ,d.eta,d.Deta,d.E,d.DE,d.g, d.N, d.TT,d.dt);
-  fprintf((*files)[5] ,"%s",mesg);
+  fprintf(*file,mesg);
+  CloseFile(file);
   return mesg;
 }
 
-void Data_Files(FILE *(*files)[], t_data d, int action) {
-  char cmd[200];
-  if(action == 0) {		/* Creating flies */
-    /* Dynamics of a given neuron (test) */
-    sprintf(mesg,"./results/%s/neuron-%d.dat",d.file,d.N/4);
-    (*files)[0] = fopen(mesg,"w");
-    fprintf((*files)[0],"# Time (ms)\tV(t) (mV) (QIF)\tV(t) (mV) (Theta)\n");
+void Data_Files(t_data *d) {
+  int i;
+  /* File paths */
+  d->ftime = (char**) malloc (7*sizeof(char*));
+  d->tmodes = (char**) malloc (6*sizeof(char*));
+  d->fscan = (char**) malloc (4*sizeof(char*));
+  d->smodes = (char**) malloc (4*sizeof(char*));
+  for(i = 0; i < 7; i++) 
+    (d->ftime)[i] = (char*) malloc(256*sizeof(char));
+  (d->ftime)[6] = NULL;
 
-    /* Final voltage distribution */
-    sprintf(mesg,"./results/%s/final_volt_dist_%.2lf.dat",d.file,d.var_value);
-    (*files)[1] = fopen(mesg,"w");
-    fprintf((*files)[1],"# Neuron (i)\tV_f (QIF)\tV_f (Theta)\n");
+  sprintf(d->file_parameters,"./results/%s/parameters.txt",d->file);
 
-    /* Raster plot */
-    if(d.disable_raster == 0){     
-      sprintf(mesg,"./results/%s/raster_%.2lf.dat",d.file,d.var_value);
-      (*files)[2] = fopen(mesg,"w");
-      fprintf((*files)[2],"# Time (ms)\tNeuron (i,qif)\tNeuron (i,Theta)\n");
-    }
+  sprintf(d->file_rvJ_FR,"./results/%s/rvJ_FR_%.lf.txt",d->file,d->var_value);
+  (d->ftime)[0] = d->file_rvJ_FR;
+  (d->tmodes)[0] = "w";
+  sprintf(d->file_rt_FR,"./results/%s/rt_FR_%.lf.txt",d->file,d->var_value);
+  (d->ftime)[1] = d->file_rt_FR;
+  (d->tmodes)[1] = "w";
+  sprintf(d->file_vt_FR,"./results/%s/vt_FR_%.lf.txt",d->file,d->var_value);
+  (d->ftime)[2] = d->file_vt_FR;
+  (d->tmodes)[2] = "w";
+  sprintf(d->file_rvJ_QIF,"./results/%s/rvJ_QIF_%.lf.txt",d->file,d->var_value);
+  (d->ftime)[3] = d->file_rvJ_QIF;
+  (d->tmodes)[3] = "w";
+  sprintf(d->file_rt_QIF,"./results/%s/rt_QIF_%.lf.txt",d->file,d->var_value);
+  (d->ftime)[4] = d->file_rt_QIF;
+  (d->tmodes)[4] = "w";
+  sprintf(d->file_vt_QIF,"./results/%s/vt_QIF_%.lf.txt",d->file,d->var_value);
+  (d->ftime)[5] = d->file_vt_QIF;
+  (d->tmodes)[5] = "w";
 
-    /* Firing rate (and other magnitudes) */
-    sprintf(mesg,"./results/%s/firing_rate_%.2lf.dat",d.file,d.var_value);
-    (*files)[3] = fopen(mesg,"w");
-    fprintf((*files)[3],"# Time (ms)\tFR (QIF)\tR (QIF)\tPhi (QIF)\tR (Theta)\tR (Theta)\tPhi (Theta)\n");    
-
-    /* Parameters */
-    sprintf(mesg,"./results/%s/parameters_%.2lf.txt",d.file,d.var_value);
-    (*files)[5] = fopen(mesg,"w");
-
-    /* Scan mode */
-    if(d.scan_mode >= 1 && d.scan == 0) {
-      switch(d.variable) {
-      case 1:
-	sprintf(mesg,"./results/%s/fr_vs_J.dat",d.file);
-	sprintf(cmd,"# J\t");
-	break;
-      case 2:
-	sprintf(mesg,"./results/%s/fr_vs_eta.dat",d.file);
-	sprintf(cmd,"# Eta\t");
-	break;
-      case 3:
-	sprintf(mesg,"./results/%s/fr_vs_g.dat",d.file);
-	sprintf(cmd,"# g\t");
-	break;
-      case 4:
-	sprintf(mesg,"./results/%s/fr_vs_E.dat",d.file);
-	sprintf(cmd,"# E\t");
-	break;
-      default:
-	d.scan_mode = 0;
-	break;
-      }
-      (*files)[4] = fopen(mesg,"w");
-      fprintf((*files)[4] ,"%sr (QIF)\tr (theta)\n",cmd);
-      sprintf(cmd,"Scan data will be saved in %s", mesg);
-      DEBUG(cmd);
-    }
-  } else if(action == 1) {
-    fclose((*files)[0]);
-    fclose((*files)[1]);
-    fclose((*files)[2]);
-    fclose((*files)[3]);
-    fclose((*files)[5]);
-    if(d.scan_mode >= 1 && d.scan >= d.scan_max)
-      fclose((*files)[4]);
-  } else if(action == 2) {
-    sprintf(mesg,"./temp/volt_dist%d.dat",d.voltdist);
-    (*files)[6] = fopen(mesg,"w");
-  } else if(action == 3) {
-    fclose((*files)[6]);
-  } else if(action == 4) {
-    sprintf(mesg,"./results/%s/inst_fr_%.2lf.dat",d.file,d.var_value);
-    (*files)[7] = fopen(mesg,"w");
-  } else if(action == 5) {
-    fclose((*files)[7]);
+  if(d->scan_mode > 0) {    
+    sprintf(d->file_rvp_FR,"./results/%s/rvp_FR_%.lf.txt",d->file,d->var_value);
+    sprintf(d->file_rvp_QIF,"./results/%s/rvp_QIF_%.lf.txt",d->file,d->var_value); 
   }
-
 }
 
 
