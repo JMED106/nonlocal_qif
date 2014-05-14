@@ -26,15 +26,22 @@
 T_FR Theory(t_data *d, T_FR fr) {
   /* counters */
 
-  d->rx = fr.r;
+  d->rx = fr.rp[d->t];
   d->vx = fr.v;
 
   /* Calculamos la integral mediante una suma de Riemann */
   fr.S = Coupling(*d,fr);
   d->S = fr.S;
+  /* printf("\nSuma: %lf",d->S); */
+  /* ESPERA */
+  /* fr.rp[d->t+1] = rk4_void(d->rx,d->dt,rdot,d); */
+  /* fr.v        = rk4_void(d->vx,d->dt,vdot,d); */
 
-  fr.r = rk4_void(d->rx,d->dt,rdot,d);
-  fr.v = rk4_void(d->vx,d->dt,vdot,d);
+  /* fr.rp[d->t+1] = Heun_void(d->rx,d->dt,rdot,d); */
+  /* fr.v        = Heun_void(d->vx,d->dt,vdot,d); */
+
+  fr.rp[d->t+1] = Euler_void(d->rx,d->dt,rdot,d);
+  fr.v        =   Euler_void(d->vx,d->dt,vdot,d);
 
   return fr;
 }
@@ -42,16 +49,23 @@ T_FR Theory(t_data *d, T_FR fr) {
 double Coupling(t_data d, T_FR fr) {
   int i;
   double s = 0;
-  double norm = 2*PI;
-  for(i = 0; i < d.l; i++) 
-    s += J_x(d,fr.x,(*(d.FR))[i].x)*(*(d.FR))[i].r;
-  /* sprintf(mesg,"La suma para fr.x: %lf da %lf ",fr.x,s ); */
-  /* DEBUG(mesg); */
+  double norm = d.l;
+  
+  for(i = 0; i < d.l; i++)  {
+    s += J_x(d,fr.x,(*(d.FR))[i].x)*((*(d.FR))[i].rp[d.t]);
+    /* if(d.t%10 == 0) { */
+    /*   sprintf(mesg,"Estoy en %0.2lf, (*(d.FR))[i].rp[d.t] = %lf ", fr.x,((*(d.FR))[i].rp[d.t])); */
+    /*   DEBUG(mesg); */
+    /*   sprintf(mesg,"La suma para fr.x: %lf da %lf ",fr.x,s ); */
+    /*   DEBUG(mesg); */
+
+    /* } */
+  }
   return s/norm;		/* Falta la normalización... */
 }
 
 double J_x(t_data d,double x, double x_prima) {
-  return (d.J0 + d.J1*cos(x_prima-x));
+  return (d.J0 +2.0*d.J1*cos(x_prima-x));
 }
   
 /*++++++++++++++++++++++++++++++++++++++

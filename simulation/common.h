@@ -71,6 +71,7 @@ typedef struct {
   double vx;
   
   double S;
+  int t;			/* Time counter */
 } t_data;
 
 typedef struct {
@@ -104,7 +105,7 @@ struct T_qif {
 };
 
 struct t_FR {
-  double r, r2;
+  double r, r2,*rp;
   double v, v2;
   double S;			/* Suma de Riemann (integral) */
   double x;

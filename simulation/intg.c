@@ -76,8 +76,25 @@ double rk42(double x, t_qif prmts, t_data d, double (*F)(double ,t_qif,t_data)) 
 double rk4_void(double x,double dt, double (*F)(double x,const void *prmts),const void *prmts) {
   double k1, k2, k3, k4;
   k1 = dt*(*F)(x,prmts);
-  k2 = dt*(*F)(x+k1/2, prmts);
-  k3 = dt*(*F)(x+k2/2,prmts);
+  k2 = dt*(*F)(x+k1/2.0, prmts);
+  k3 = dt*(*F)(x+k2/2.0,prmts);
   k4 = dt*(*F)(x+k3,prmts);
-  return (x + k1/6 + k2/3 + k3/3 + k4/6);
+  return (x + k1/6.0 + k2/3.0 + k3/3.0 + k4/6.0);
 }
+
+double Heun_void(double x,  double dt, double(* F)( double x, const void *prmts), const void* prmts) {
+  double xint = 0, x2 = 0;
+
+  xint = x + dt*(*F)(x,prmts);
+  sprintf(mesg,"xint = %lf",xint );
+  DEBUG3(mesg);
+  x2   = x + 0.2*dt*((*F)(xint,prmts) + (*F)(x,prmts));
+  sprintf(mesg,"x2 = %lf",x2 );
+  DEBUG3(mesg);
+  return x2;
+}
+
+
+double Euler_void(double x,  double dt, double(* F)( double x, const void *prmts), const void* prmts) {
+  return x + dt*F(x,prmts);
+}  

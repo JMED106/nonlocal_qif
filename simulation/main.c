@@ -19,7 +19,7 @@
 #include"gnuplot_i.h"		/* Gnuplot pipeline suit */
 #include<unistd.h>
 
-#define PI 4*atan(1)
+#define PI 3.14159265358979323846
 
 /* Global variables declarationx */
 int debug = 0,			/* Boolean: debugging activator */
@@ -40,6 +40,7 @@ char mesg2[1024];
 void    Intro(t_data *d, int *Nscan, int *tr_TT);
 double *InitCond(double *p , int N, int dist_type,  double center, double gamma);
 void    InitialState(t_qif * th, t_data , int type);
+void InitialState_FR(T_FR *fr,t_data d, int type);
 char   *DataDebug(t_data d, FILE **file);
 double  MeanField(t_qif *th, t_data , int type);
 t_data *Var_update(t_data *d);
@@ -128,9 +129,12 @@ int main(int argc, char **argv) {
   /* Each FR[i] represents a cluster of neurons, i.e. the columns */
 
   neur = (t_qif**) calloc(d->l,sizeof(t_qif*));
-  for(j=0 ;j<d->l ;j++ ) 
+  for(j=0 ;j<d->l ;j++ ) {
     neur[j] = (t_qif*) calloc (d->N,sizeof(t_qif));
+    FR[j].rp = (double*) calloc ((int)((double)d->TT/d->dt) + 2, sizeof(double));
+  }
 
+  /* Initial condition of the firing rate is stored in the 0th position of the vector */
   d->FR = &FR;
   d->QIF = &neur;
 
@@ -142,6 +146,7 @@ int main(int argc, char **argv) {
   /* Initial tunning: step size, and scanning issues */
   Intro(d,&Nscan,&time_correction);
   total_t = (int)((float)d->TT/d->dt);
+  d->t = 1;
   d->DX = 2.0*PI;
   d->dx = d->DX/(d->l*1.0);
 
@@ -158,9 +163,16 @@ int main(int argc, char **argv) {
 
     FileT = LoadFileLibrary(d->ftime, d->tmodes);
     FileT.multiopen(&file,&FileT);
+    /* InitialState_FR(FR,*d,4); */
+    for(i=0 ;i<d->l ;i++ ) {
+      FR[i].rp[0] = (d->J0 + sqrt(pow(d->J0,2) + 4.0*PI*PI*d->eta))/(2*PI*PI)+ 0.0001;
+      FR[i].v = 0.0;
+    }
+    FR[50].rp[0]+=0.0000;
 
     /* Reset counters */
     t = 0;
+    d->t = 0;
     time = t*d->dt;
     /* Run */
     do {			/* Tiempo */
@@ -168,25 +180,22 @@ int main(int argc, char **argv) {
 	sprintf(mesg,"%d%% ",(int)(t*100.0/total_t));
 	DEBUG(mesg);
       }
+
 #pragma omp parallel for schedule(dynamic,chunksize)
       for(i=0 ;i<d->l ;i++ ) {	/* Espacio */
 	/* Asignamos la posición en la que nos encontramos x_i = -PI + i*dx, dónde dx = 2PI/l */
-	x = -PI + i*d->dx;
-	FR[i].x = x;
+	FR[i].x =  -PI + i*d->dx;
 	/* Ejecutamos la función de las eqs. FR */
 	FR[i] = Theory(d,FR[i]);
-	
       }
-      fprintf(file[1],"%lf\t",time);
-      fprintf(file[2],"%lf\t",time);
       for(i=0 ;i<d->l ;i++ ) {
-	fprintf(file[1],"%lf\t",FR[i].r);
+	fprintf(file[1],"%lf\t",FR[i].rp[d->t]);
 	fprintf(file[2],"%lf\t",FR[i].v);
       }
       fprintf(file[1],"\n");
       fprintf(file[2],"\n");
 
-      t++;
+      t++; d->t++;
       time = t*d->dt;
     } while(time < d->TT);	/* Paso temporal (se puede hacer de la misma manera que en el QIF */
     sprintf(mesg,"%d%% ",(int)(t*100.0/total_t));
@@ -194,7 +203,7 @@ int main(int argc, char **argv) {
 
     for(i=0 ;i<d->l ;i++ ) {
       x = -PI + i*d->dx;
-      fprintf(file[0],"%lf\t%lf\t%lf\t%lf\n",x,FR[i].r,FR[i].v,J_x(*d,x,0));
+      fprintf(file[0],"%lf\t%lf\t%lf\t%lf\n",x,FR[i].rp[d->t],FR[i].v,J_x(*d,x,0));
     }
 	
     FileT.closeall(&file,&FileT);
@@ -202,6 +211,8 @@ int main(int argc, char **argv) {
   } while (d->scan < Nscan);  /* Simulation ends here */
 
   system("rm -r ./temp");
+  sprintf(mesg,"cp ./results/%s/*.txt ~/Escritorio/gp/",d->file);
+  system(mesg);
   printf("\n");
   return 0;  
 }
@@ -297,6 +308,49 @@ void InitialState(t_qif *th,t_data d, int type) {
     break;
   }
 }
+
+void InitialState_FR(T_FR *fr,t_data d, int type) {
+  int i;
+  double k = 0, h, v;
+  gsl_rng *r;
+  gsl_rng_env_setup();		/* Random generator initialization */
+  gsl_rng_default_seed = rand()*RAND_MAX;
+
+  const gsl_rng_type *T;
+  T = gsl_rng_default;
+  r = gsl_rng_alloc(T);
+
+  /* We must define the relationship between v-th
+   * v = tg(th/2). 
+   * But th goes from 0 to PI 
+   * v goes from v_reset to v_peak (finites) */
+
+  switch(type) {
+  case 0:			/* Uniform distribution between reset and peak values */
+    for(i=0 ;i < d.l ;i++ ) {
+      fr[i].rp[0] = 1.0 + 1.0*gsl_rng_uniform(r);
+    }
+    break;
+  case 2:			/* Null distribution: constant 0 valued. */
+    for(i=0 ;i < d.l ;i++ ) {
+      fr[i].rp[0] = 0.0;
+    }
+    break;
+  case 4:			/* Lorentzian distribution centered at 10 and width of 5 */
+    h = 1;			/* (take into account that the distribution is cut at vr */
+    v= 1;			/*  and vp) */
+    for(i=0 ;i < d.l ;i++ ) {
+      k = (2.0*(i+1) -d.l -1.0)/(d.l+1.0);
+      fr[i].rp[0] = v + h*tan((PI/2.0)*k);
+      if(fabs(fr[i].rp[0]) > 1) fr[i].rp[0] = v;
+    }
+    break;
+  default:
+    ARG_ERROR;
+    break;
+  }
+}
+
 
 /* === FUNCTION  MeanField ====================
  * Description:  Computes S
@@ -411,23 +465,23 @@ void Intro(t_data *d, int *Nscan, int *tr_TT) {
   if(d->max < d->min) d->step = (-1.0)*scanstep;
   if(d->scan_mode == 0) *Nscan = 0;
 
-  /* Time step setup */
-  dt = d->dt;
-  /* dt(tr) adjustment */
-  tr1 = 1.0/fabs(d->vp);
-  tr2 = 1.0/fabs(d->vr);
-  tr = (tr1 < tr2)? tr1:tr2;
+  /* /\* Time step setup *\/ */
+  /* dt = d->dt; */
+  /* /\* dt(tr) adjustment *\/ */
+  /* tr1 = 1.0/fabs(d->vp); */
+  /* tr2 = 1.0/fabs(d->vr); */
+  /* tr = (tr1 < tr2)? tr1:tr2; */
   
-  dt = tr;
-  if(dt != d->dt) {
-    d->dt = dt;
-    sprintf(mesg,"Time step dt adjusted to: dt = %lf ",dt );
-    DEBUG(mesg);
-  }
+  /* dt = tr; */
+  /* if(dt != d->dt) { */
+  /*   d->dt = dt; */
+  /*   sprintf(mesg,"Time step dt adjusted to: dt = %lf ",dt ); */
+  /*   DEBUG(mesg); */
+  /* } */
 
-  *tr_TT = (int)(tr/dt);
-  sprintf(mesg,"Refractory period (in steps): %d ",*tr_TT);
-  DEBUG(mesg);
+  /* *tr_TT = (int)(tr/dt); */
+  /* sprintf(mesg,"Refractory period (in steps): %d ",*tr_TT); */
+  /* DEBUG(mesg); */
 
   if(d->N*d->TT > d->MaxDim)
     d->disable_raster = 1;
