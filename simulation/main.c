@@ -14,7 +14,7 @@
 #include<gsl/gsl_rng.h>		/* GNU Scientific library */
 #include<gsl/gsl_randist.h>
 #include<ctype.h>
-#include<limits.h>
+
 #include<omp.h>		        /* Parallel OMP library */
 #include"gnuplot_i.h"		/* Gnuplot pipeline suit */
 #include<unistd.h>
@@ -81,7 +81,7 @@ int main(int argc, char **argv) {
   /* Data store */
   Create_Dir("results");
   FILE *file[6];
-  FILE *fileS[4];
+  /* FILE *fileS[4]; */
   FILE *volt;
 
   t_file FileT,FileS;
@@ -125,13 +125,13 @@ int main(int argc, char **argv) {
     if(argv[1][0] != '-') def = 0;
   }
 
-  FR = (T_FR*) calloc (d->l,sizeof(T_FR)); /* We create our spatially extended systems (number of columns) */
+  FR = (T_FR*) calloc (d->l+1,sizeof(T_FR)); /* We create our spatially extended systems (number of columns) */
   /* Each FR[i] represents a cluster of neurons, i.e. the columns */
 
-  neur = (t_qif**) calloc(d->l,sizeof(t_qif*));
-  for(j=0 ;j<d->l ;j++ ) {
-    neur[j] = (t_qif*) calloc (d->N,sizeof(t_qif));
-    FR[j].rp = (double*) calloc ((int)((double)d->TT/d->dt) + 2, sizeof(double));
+  neur = (t_qif**) calloc(d->l +1,sizeof(t_qif*));
+  for(j=1 ;j<=d->l ;j++ ) {
+    neur[j] = (t_qif*) calloc (d->N +1 ,sizeof(t_qif));
+    FR[j].rp = (double*) calloc ((int)((double)d->TT/d->dt) + 5, sizeof(double));
   }
 
   /* Initial condition of the firing rate is stored in the 0th position of the vector */
@@ -147,7 +147,7 @@ int main(int argc, char **argv) {
   Intro(d,&Nscan,&time_correction);
   total_t = (int)((float)d->TT/d->dt);
   d->t = 1;
-  d->DX = 2.0*PI;
+  d->DX = 2.0*M_PI;
   d->dx = d->DX/(d->l*1.0);
 
 
@@ -164,11 +164,12 @@ int main(int argc, char **argv) {
     FileT = LoadFileLibrary(d->ftime, d->tmodes);
     FileT.multiopen(&file,&FileT);
     /* InitialState_FR(FR,*d,4); */
-    for(i=0 ;i<d->l ;i++ ) {
-      FR[i].rp[0] = (d->J0 + sqrt(pow(d->J0,2) + 4.0*PI*PI*d->eta))/(2*PI*PI)+ 0.0001;
-      FR[i].v = 0.0;
+    for(i=1 ;i<=d->l ;i++ ) {
+      FR[i].rp[0] = (d->J0 + sqrt(d->J0*d->J0 + 4.*M_PI*M_PI*d->eta))/(2.*M_PI*M_PI);
+      FR[i].rp[0] +=-1E-4*cos(i*d->dx);
+      FR[i].v = 0;
     }
-    FR[50].rp[0]+=0.0000;
+    /* FR[50].rp[0]+=0.0001; */
 
     /* Reset counters */
     t = 0;
@@ -181,14 +182,14 @@ int main(int argc, char **argv) {
 	DEBUG(mesg);
       }
 
-#pragma omp parallel for schedule(dynamic,chunksize)
-      for(i=0 ;i<d->l ;i++ ) {	/* Espacio */
-	/* Asignamos la posición en la que nos encontramos x_i = -PI + i*dx, dónde dx = 2PI/l */
-	FR[i].x =  -PI + i*d->dx;
+/* #pragma omp parallel for schedule(dynamic,chunksize) */
+      for(i=1 ;i<=d->l ;i++ ) {	/* Espacio */
+	/* Asignamos la posición en la que nos encontramos x_i = -M_PI + i*dx, dónde dx = 2M_PI/l */
+	FR[i].x =  i;
 	/* Ejecutamos la función de las eqs. FR */
-	FR[i] = Theory(d,FR[i]);
+	Theory(d,&FR[i]);
       }
-      for(i=0 ;i<d->l ;i++ ) {
+      for(i=1 ;i<=d->l ;i++ ) {
 	fprintf(file[1],"%lf\t",FR[i].rp[d->t]);
 	fprintf(file[2],"%lf\t",FR[i].v);
       }
@@ -201,9 +202,9 @@ int main(int argc, char **argv) {
     sprintf(mesg,"%d%% ",(int)(t*100.0/total_t));
     DEBUG(mesg);
 
-    for(i=0 ;i<d->l ;i++ ) {
-      x = -PI + i*d->dx;
-      fprintf(file[0],"%lf\t%lf\t%lf\t%lf\n",x,FR[i].rp[d->t],FR[i].v,J_x(*d,x,0));
+    for(i=1 ;i<=d->l ;i++ ) {
+      x = -M_PI + i*d->dx;
+      fprintf(file[0],"%lf\t%lf\t%lf\t%lf\n",x,FR[i].rp[d->t],FR[i].v,J_x(*d,i,0));
     }
 	
     FileT.closeall(&file,&FileT);
@@ -214,6 +215,13 @@ int main(int argc, char **argv) {
   sprintf(mesg,"cp ./results/%s/*.txt ~/Escritorio/gp/",d->file);
   system(mesg);
   printf("\n");
+  for(i=0 ;i<d->l ;i++ ) {
+    free(FR[i].rp);
+    free(neur[i]);
+  }
+  free(FR);
+  free(neur);
+  free(d);
   return 0;  
 }
 
@@ -250,7 +258,7 @@ double *InitCond(double *p, int N, int distr_type, double center, double gamma) 
   case 2:			/* Cauchy ordered */
     for(i=0 ;i<N ;i++ ) {
       k = (2.0*(i+1) - N -1.0)/(N+1.0);
-      p[i] = center + gamma*tan((PI/2.0)*k);
+      p[i] = center + gamma*tan((M_PI/2.0)*k);
     }
     break;
   default:
@@ -280,7 +288,7 @@ void InitialState(t_qif *th,t_data d, int type) {
 
   /* We must define the relationship between v-th
    * v = tg(th/2). 
-   * But th goes from 0 to PI 
+   * But th goes from 0 to M_PI 
    * v goes from v_reset to v_peak (finites) */
 
   switch(type) {
@@ -299,7 +307,7 @@ void InitialState(t_qif *th,t_data d, int type) {
     v= 10;			/*  and vp) */
     for(i=0 ;i < d.N ;i++ ) {
       k = (2.0*(i+1) -d.N -1.0)/(d.N+1.0);
-      th[i].v = v + h*tan((PI/2.0)*k);
+      th[i].v = v + h*tan((M_PI/2.0)*k);
       if(fabs(th[i].v) > d.vp) th[i].v = v;
     }
     break;
@@ -322,7 +330,7 @@ void InitialState_FR(T_FR *fr,t_data d, int type) {
 
   /* We must define the relationship between v-th
    * v = tg(th/2). 
-   * But th goes from 0 to PI 
+   * But th goes from 0 to M_PI 
    * v goes from v_reset to v_peak (finites) */
 
   switch(type) {
@@ -341,7 +349,7 @@ void InitialState_FR(T_FR *fr,t_data d, int type) {
     v= 1;			/*  and vp) */
     for(i=0 ;i < d.l ;i++ ) {
       k = (2.0*(i+1) -d.l -1.0)/(d.l+1.0);
-      fr[i].rp[0] = v + h*tan((PI/2.0)*k);
+      fr[i].rp[0] = v + h*tan((M_PI/2.0)*k);
       if(fabs(fr[i].rp[0]) > 1) fr[i].rp[0] = v;
     }
     break;
@@ -361,7 +369,7 @@ double MeanField(t_qif *th, t_data d,int type) {
   int i;
   double s = 0;
   double delta = 1.0/d.dt;
-  double norm = (1.0*PI/d.N)*delta;
+  double norm = (1.0*M_PI/d.N)*delta;
 
   if(type == 1) {
     th[0].global_s1 = 0;
@@ -508,9 +516,12 @@ char *DataDebug(t_data d,FILE **file) {
 	  "\t Value of E (v)          = %5.2lf\n"
 	  "\t Value of DE (B)         = %5.2lf\n"
 	  "\t Value of g (g)          = %5.2lf\n"
+	  "\t Value of J0 (a)         = %5.2lf\n"
+	  "\t Value of J1 (b)         = %5.2lf\n"
+	  "\t Value of  l (l)         = %5d\n"
 	  "\t Total number of Neurons = %5d\n"
 	  "\t Simulation Time         = %5.2lf\n"
-	  "\t Time step               = %5.4lf\n", d.vr, d.vp, d.J,d.DJ,d.eta,d.Deta,d.E,d.DE,d.g, d.N, d.TT,d.dt);
+	  "\t Time step               = %5.4lf\n", d.vr, d.vp, d.J,d.DJ,d.eta,d.Deta,d.E,d.DE,d.g,d.J0,d.J1,d.l, d.N, d.TT,d.dt);
   fprintf(*file,mesg);
   CloseFile(file);
   return mesg;
@@ -597,7 +608,7 @@ void R_script(t_data d, double x, double y) {
 	  "avg_volt <- mean(voltages);\n"
 	  "avg_fr <- mean(firing_rates);\n"
 	  "print(avg_fr);\n"
-	  "print(avg_volt);\n",(int)d.vp,(int)d.vp,(int)d.vp,x*(PI),y,50,1e-5,2048);
+	  "print(avg_volt);\n",(int)d.vp,(int)d.vp,(int)d.vp,x*(M_PI),y,50,1e-5,2048);
   fclose(Rscript);
 }
 

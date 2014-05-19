@@ -11,17 +11,17 @@ extern int d_level;
 
 
 #ifndef PI
-#define PI (4.0*atan(1.0))
+#define PI 3.14159265358979323846
 #endif
 extern char DATA_FILE[50];
 extern FILE *gp;
 
 /* Functions declaration. */
-T_FR Theory(t_data *, T_FR );
+T_FR Theory(t_data *, T_FR *);
 double theory1(double ,t_qif ,t_data);
 double theory2(double ,t_qif ,t_data);
 double Coupling(t_data d, T_FR fr);
-double J_x(t_data d,double x, double x_prima);
+double J_x(t_data d,int x, int x_prima);
 double rdot(double x, t_data *d);
 double vdot(double x, t_data *d);
 

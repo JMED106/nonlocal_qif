@@ -108,7 +108,7 @@ struct t_FR {
   double r, r2,*rp;
   double v, v2;
   double S;			/* Suma de Riemann (integral) */
-  double x;
+  int x;
 } ;
 
 typedef struct t_FR T_FR;

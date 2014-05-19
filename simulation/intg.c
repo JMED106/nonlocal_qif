@@ -96,5 +96,7 @@ double Heun_void(double x,  double dt, double(* F)( double x, const void *prmts)
 
 
 double Euler_void(double x,  double dt, double(* F)( double x, const void *prmts), const void* prmts) {
-  return x + dt*F(x,prmts);
+  double xint = 0;
+  xint = x;
+  return xint + dt*F(x,prmts);
 }  

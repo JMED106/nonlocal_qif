@@ -26,7 +26,7 @@ extern char mesg[1024];
 #endif
 
 #ifndef PI
-#define PI (4*atan(1.0))
+#define PI 3.14159265358979323846
 #endif
 
 #define NP_CHECK(ptr) \
