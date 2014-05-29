@@ -1,9 +1,0 @@
-#!/bin/bash
-
-echo "Compiling..."
-cd $(pwd)/code/src
-make -s
-make clean
-mv nonlocal* ../../exec
-cd ../../exec
-cp ../code/parameters/* ./
