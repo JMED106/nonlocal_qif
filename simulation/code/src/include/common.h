@@ -54,7 +54,9 @@ typedef struct {
   
   double rx;
   double vx;
-  
+
+  double **R;
+  double **V;
   double S;
   int t;			/* Time counter */
 } t_data;

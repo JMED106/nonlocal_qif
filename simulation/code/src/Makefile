@@ -19,8 +19,8 @@ CC=gcc
 CFLAGS=-g -Wall -Wstrict-prototypes  -I$(NR_HEAD)  -I$(GNDIR) -I$(IDIR)
 
 # Included libraries
-COMPLIBS=-lm -lgsl -lgslcblas 
-COMPLIBS_PARALLEL=-lm -lgsl -lgslcblas -fopenmp
+COMPLIBS=-lm -lgsl -lgslcblas -fopenmp
+COMPLIBS_PARALLEL=-lm -lgsl -lgslcblas  -fopenmp
 
 ## Object directory
 OBDIR=obj
@@ -42,6 +42,9 @@ $(OBDIR)/%.o: $(GNDIR)/%.c
 
 $(OBDIR)/%.o: $(NR_LIBS)/%.c
 	$(CC) -c -o $@ $< $(COMPLIBS) $(CFLAGS)
+
+parallel: main.c
+	$(CC) -c -o $@ $< $(COMPLIBS_PARALLEL) $(CFLAGS)
 
 clean:
 	rm obj/* $(PROGRAM_NAME) *~

@@ -30,6 +30,7 @@ char mesg2[1024];
 #include "file.h"
 #include "nrutil.h"
 #include "nr.h"
+#include "field.h"
 
 /* Functions declaration. */
 double *InitCond(double *p, int N, int distr_type, double center, double gamma);
@@ -89,14 +90,13 @@ int main(int argc, char **argv) {
   }
   t_file FileT;
 
-  /* FILE *fileR, *fileV,*fileRV; */
-  /* fileR = fopen("rt.dat","w"); */
-  /* fileV = fopen("vt.dat","w"); */
-  /* fileRV = fopen("rvt.dat","w"); */
+
   /* Dynamic variables (system variables) */
-  double *R,*V;
+  double *R,*R2,*V;
   double *J;
 
+  double **qif;
+  
   
   /* ++++++++++++++++++++++++++++++++++++++++++++++++++ */
   
@@ -128,12 +128,19 @@ int main(int argc, char **argv) {
   }
 
   R = dvector(1,d->l);
+  R2 = dvector(1,d->l);
   V = dvector(1,d->l);
   J = dvector(1,d->l);
 
+  qif = dmatrix(1,d->l,1,d->N);
+
+  d->R = &R;
+  d->V = &V;
+
+
 #ifdef _OPENMP			/* Work is divided between the cores */
   int chunksize = d->l/numthreads;
-  if(chunksize > 5) chunksize = 5;
+  if(chunksize > 10) chunksize = 10;
 #endif
 
   /* Initial tunning: step size, and scanning issues */
@@ -145,18 +152,20 @@ int main(int argc, char **argv) {
   /**********************************/
   do {    
     /* InitialState_FR(FR,*d,4); */
+#pragma omp parallel for schedule(dynamic,chunksize)
     for(i=1 ;i<=d->l ;i++ ) {
       R[i]=(d->J0+sqrt(d->J0*d->J0+4.*M_PI*M_PI*d->eta))/(2.*M_PI*M_PI)+0*1E-6;
       R[i]+=-1E-4*cos(i*d->dx);
+      R2[i] = R[i];
       V[i] = 0.0;
     }
+    /* printf("\nR[1] = %lf\td->R[0] = %lf\n",R[50],(*d->R)[50]); */
     /* File names */
     Data_Files(d);
     
     /* Debbug  and openning files*/
     if(def == 0) DEBUG(DataDebug(*d,&file[0]));
     FileT = LoadFileLibrary(d->ftime, d->tmodes);
-
     FileT.multiopen(&file,&FileT);
 
     /* Reset counters */
@@ -168,23 +177,16 @@ int main(int argc, char **argv) {
 	sprintf(mesg,"%d%% ",(int)(t*100.0/t_max));
 	DEBUG(mesg);
       }
-
 #pragma omp parallel for private(j) schedule(dynamic,chunksize)
-      for(i=1 ;i<=d->l ;i++ ) {	/* Espacio */
-	/* We compute the coupling J */
-	J[i] = 0;
-	for(j=1 ;j<=d->l ;j++ ) 
-	  J[i] +=(d->J0+2.*d->J1*cos((i-j)*d->dx))*R[j];
-	J[i] /= d->l;
-      }
-#pragma omp parallel for schedule(dynamic,chunksize)
-      for(i=1 ;i<=d->l ;i++ ) {
+      for(i=1 ;i<=d->l ;i++ ) { 	/* Espacio */
+	N_F(J,R2,i,*d);
 	/* We integrate the ODEs */
 	R[i] += d->dt*(d->Deta/M_PI + 2.*R[i]*V[i]);
 	V[i] += d->dt*(d->eta + pow(V[i],2) - pow(R[i]*M_PI,2) + J[i]);
       }
       /* Results are stored */
       for(i=1 ;i<d->l ;i++ ) {
+	R2[i] = R[i];
 	fprintf(file[1] ,"%lf ",R[i]);
 	fprintf(file[2] ,"%lf ",V[i]);
       }
@@ -201,14 +203,16 @@ int main(int argc, char **argv) {
     
     sprintf(mesg,"%d%% ",(int)(t*100.0/t_max));
     DEBUG(mesg);
-    /* fclose(fileR); fclose(fileV);fclose(fileRV); */
     FileT.closeall(&file,&FileT);
   } while (d->scan < Nscan);  /* Simulation ends here */
 
 
   free_dvector(R,1,d->l);
+  free_dvector(R2,1,d->l);
   free_dvector(V,1,d->l);
   free_dvector(J,1,d->l);
+
+
   free(d);
   system("rm -r ./temp");
   printf("\n");

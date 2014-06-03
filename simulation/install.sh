@@ -4,7 +4,7 @@ echo "Compiling..."
 cd ~/Dropbox/Doctorado/Nonlocal/simulation
 cd code/src
 make -s
-make clean
+#make clean
 mv nonlocal* ../../exec
 cd ../../exec
 cp ../code/parameters/* ./
