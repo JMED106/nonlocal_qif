@@ -138,6 +138,31 @@ int **imatrix(long nrl, long nrh, long ncl, long nch)
 	return m;
 }
 
+unsigned long int **ulimatrix(long nrl, long nrh, long ncl, long nch)
+/* allocate a int matrix with subscript range m[nrl..nrh][ncl..nch] */
+{
+	long i, nrow=nrh-nrl+1,ncol=nch-ncl+1;
+	unsigned long int **m;
+
+	/* allocate pointers to rows */
+	m=(unsigned long int **) malloc((size_t)((nrow+NR_END)*sizeof(unsigned long int*)));
+	if (!m) nrerror("allocation failure 1 in matrix()");
+	m += NR_END;
+	m -= nrl;
+
+
+	/* allocate rows and set pointers to them */
+	m[nrl]=(unsigned long int *) malloc((size_t)((nrow*ncol+NR_END)*sizeof(unsigned long int)));
+	if (!m[nrl]) nrerror("allocation failure 2 in matrix()");
+	m[nrl] += NR_END;
+	m[nrl] -= ncl;
+
+	for(i=nrl+1;i<=nrh;i++) m[i]=m[i-1]+ncol;
+
+	/* return pointer to array of pointers to rows */
+	return m;
+}
+
 float **submatrix(float **a, long oldrl, long oldrh, long oldcl, long oldch,
 	long newrl, long newcl)
 /* point a submatrix [newrl..][newcl..] to a[oldrl..oldrh][oldcl..oldch] */
@@ -260,6 +285,13 @@ void free_dmatrix(double **m, long nrl, long nrh, long ncl, long nch)
 }
 
 void free_imatrix(int **m, long nrl, long nrh, long ncl, long nch)
+/* free an int matrix allocated by imatrix() */
+{
+	free((FREE_ARG) (m[nrl]+ncl-NR_END));
+	free((FREE_ARG) (m+nrl-NR_END));
+}
+
+void free_ulimatrix(unsigned long int **m, long nrl, long nrh, long ncl, long nch)
 /* free an int matrix allocated by imatrix() */
 {
 	free((FREE_ARG) (m[nrl]+ncl-NR_END));

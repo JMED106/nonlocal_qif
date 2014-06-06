@@ -59,39 +59,16 @@ typedef struct {
   double **V;
   double S;
   int t;			/* Time counter */
+  double tau;			/* characteristic time in at */
+
+  double t_min;
+
+  unsigned long int t_spike;	/* Time when the spike occurs */
+  double tau_p;			/* Time to reach infinity from vpeak (t_spike) */
+  double tau_r;			/* Time to reach vreset from -infinity */
+  int wait;			/* Refractory Time steps from vp to vr */
 } t_data;
 
-struct T_qif {
-  double v;
-  double x;
-
-  double eta;
-
-  double r;			/* Firing Rate saved in each oscillator */
-  double spike;			/* Has the oscillator spiked? */
-  int tr;			/* How many steps ago has the oscillator spiked? */
-  int total_spikes;	        /* Total number of spike of this oscillator */
-  int global_s1;
-
-  int N;			/* Total number of oscillators (redundant) */
-  double FR;
-  int pert;
-
-  /* For g */
-  double E;
-  double g;
-  double J;
-};
-
-struct t_FR {
-  double r, r2,*rp;
-  double v, v2;
-  double S;			/* Suma de Riemann (integral) */
-  int x;
-} ;
-
-typedef struct t_FR T_FR;
-typedef struct T_qif t_qif;
   
 #ifndef GSL_SIGN
 #define GSL_SIGN(x) ((x) >= 0 ? 1: -1)
