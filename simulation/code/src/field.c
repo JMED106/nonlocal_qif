@@ -8,7 +8,7 @@ void N_F(double *J,double *rx,int i,  t_data d) {
   int j;
   J[i] = 0.0;
 /* #pragma omp parallel pivate(j) */
-  for(j=1 ;j<d.l ;j++ ) 
+  for(j=1 ;j<=d.l ;j++ ) 
     J[i] += J_F(d,i,j,rx);
   J[i] /= d.l;
 }

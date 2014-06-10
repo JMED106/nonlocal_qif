@@ -67,6 +67,8 @@ typedef struct {
   double tau_p;			/* Time to reach infinity from vpeak (t_spike) */
   double tau_r;			/* Time to reach vreset from -infinity */
   int wait;			/* Refractory Time steps from vp to vr */
+
+  int sample;
 } t_data;
 
   

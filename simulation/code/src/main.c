@@ -180,10 +180,10 @@ int main(int argc, char **argv) {
   /* New simulations can start here */
   /**********************************/
   do {        
-#pragma omp parallel for schedule(dynamic,chunksize)
+#pragma omp parallel for private(j) schedule(dynamic,chunksize)
     for(i=1 ;i<=d->l ;i++ ) {
       R[i]=(d->J0+sqrt(d->J0*d->J0+4.*M_PI*M_PI*d->eta))/(2.*M_PI*M_PI)+0*1E-6;
-      R[i]+=-1E-4*cos(i*d->dx);
+      /* R[i]+=-1E-4*cos(i*d->dx); */
       rqif[i] = R[i];
       rqif2[i] = R[i];
       R2[i] = R[i];
@@ -205,12 +205,7 @@ int main(int argc, char **argv) {
 	qif_eta[i][j] = pt2[j];
       }
     }
-    FILE *hola;
-    hola = fopen("inicial.txt","w");
-    for(i=1 ;i<=d->N ;i++ ) {
-      fprintf(hola ,"%lf\t%lf\n ",QIF[1][i],qif_eta[1][i]);
-    }
-    fclose(hola);
+
     /* printf("\nR[1] = %lf\td->R[0] = %lf\n",R[50],(*d->R)[50]); */
     /* File names */
     Data_Files(d);
@@ -226,13 +221,17 @@ int main(int argc, char **argv) {
     d->t = 0;
     /* Run */
     do {			/* Tiempo */
-      if(t%(t_max/10) == 0) { /* Control point */
-	sprintf(mesg,"%d%% ",(int)(t*100.0/t_max));
-	DEBUG(mesg);
+      if(t == t_max/2) {
+	sprintf(mesg,"Perturbation.");	DEBUG(mesg);
+	for(i=1; i<=d->l;i++) {
+	  R2[i]+=-1E-4*cos(i*d->dx)*d->pert_amplitude;
+	  rqif2[i]+=-1E-4*cos(i*d->dx)*d->pert_amplitude;
+	}
       }
-#pragma omp parallel for private(j) schedule(dynamic,chunksize)
+      if(t%(t_max/10) == 0) { /* Control point */
+	sprintf(mesg,"%d%% ",(int)(t*100.0/t_max));DEBUG(mesg); }
+#pragma omp parallel for  schedule(dynamic,chunksize)
       for(i=1 ;i<=d->l ;i++ ) { 	/* Espacio */
-	spike[t][i] = 0;
 	N_F(J,R2,i,*d);
 	N_F(Jqif,rqif2,i,*d);
 	/* We integrate the ODEs */
@@ -245,6 +244,7 @@ int main(int argc, char **argv) {
 	count[i]++;
 	/* v here */
       }
+
       /* Results are stored */
       for(i=1 ;i<=d->l ;i++ ) {
 	R2[i] = R[i];
@@ -255,12 +255,12 @@ int main(int argc, char **argv) {
 	/* fprintf(file[4] ,"%lf ",rqif[i]); */
 
 	/* Firing rate of QIF */
-	if(t%10 == 0) 
+	if(t%d->sample == 0) 
 	  FiringRate(&count[i], &spike2[i], *d, &file[4]);
       }
       fprintf(file[1] ,"\n");
       fprintf(file[2] ,"\n");
-      if(t%10 == 0) 
+      if(t%d->sample == 0) 
 	fprintf(file[4] ,"\n");
 
       d->t++;
@@ -274,7 +274,7 @@ int main(int argc, char **argv) {
 
     /* Final shape is stored */
     for(i=1 ;i<=d->l ;i++ ) 
-      fprintf(file[3] ,"%lf\t%lf\t%lf\t%lf\n",-M_PI + i*d->dx,R[i],V[i],Jqif[i]);
+      fprintf(file[3] ,"%lf\t%lf\t%lf\t%lf\n",-M_PI + i*d->dx,rqif[i],V[i],Jqif[i]);
     
     sprintf(mesg,"%d%% ",(int)(t*100.0/t_max));
     DEBUG(mesg);
@@ -389,7 +389,7 @@ double *InitialState(double *p, t_data d, int distr_type, double center, double 
     for(i=1 ;i <= d.N ;i++ ) {
       k = (2.0*(i+1) -d.N -1.0)/(d.N+1.0);
       p[i] = center + gamma*tan((M_PI/2.0)*k);
-      if(fabs(p[i]) > d.vp) p[i] = 0.0; /* If we want to have ou values between vr and vp */
+      if(fabs(p[i]) > d.vp) p[i] = 0.0; /* If we want to have our values between vr and vp */
     }
     break;
   default:
@@ -411,24 +411,30 @@ double MeanField(t_data d,int pop) {
   double delta = 1.0/d.dt;
   double norm = (1.0/d.N)*delta;
   double norm2 = (1.0*M_PI/d.N)*delta;
+  double norm3 = (1.0/d.N);
   double t_min = 0;
   spike[d.t][pop] = 0;
 
   for(i=1 ;i<=d.N ;i++ ) { 
     if(Spikes[pop][i] == d.t_spike) 
-      s+= 1;
+      spike[d.t][pop]+= 1;
   }
-  spike2[pop] += s;
-  spike[d.t][pop] = s;
+  /* if(s > 5) { */
+  /*   sprintf(mesg,"t: %lf\ti= %d\ts1 = %lf\ts1_norm = %lf ",d.t*d.dt,pop, s,s*norm);   DEBUG(mesg);} */
 
-  /* s = 0; */
-  /* if(d.t_min >= d.t) t_min = d.t; */
-  /* else t_min = d.t_min; */
-  /* for(i=d.t-t_min ;i<=d.t ;i++ )  */
-  /*   s+=spike[i][pop]; */
+  spike2[pop] += spike[d.t][pop];
+  
+  if(d.t_min >= d.t) t_min = d.t;
+  else t_min = d.t_min;
+  for(i=d.t-t_min ;i<=d.t ;i++ )
+    s+=at((d.t-i)*d.dt,d)*spike[i][pop];
 
-  /* s+=at((d.t-i)*d.dt,d)*spike[i-1][pop]; */
-  s = s*norm;	
+  if(d.t < 100) s = spike[d.t][pop]*norm;
+  else
+    s = s*norm3;	
+  /* if(s > 5) { */
+  /*   sprintf(mesg,"t: %lf\ti= %d\ts2 = %lf ",d.t*d.dt,pop, s);   DEBUG(mesg);} */
+
   return s;
 }
 
@@ -438,7 +444,9 @@ double MeanField(t_data d,int pop) {
  * ======================================= */
 
 double at(double t, t_data d) {
-  return (1.0/d.tau)*exp(-t/d.tau);
+  double a;
+  a = (1.0/d.tau)*exp(-t/d.tau);
+  return a;
 }
 
 
@@ -530,8 +538,13 @@ void Intro(t_data *d, int *Nscan, int *tr_TT) {
   d->dx = 2.0*M_PI/d->l;
 
   /* d.tau from at */
-  d->tau = 10*d->dt;
-  d->t_min = 100;
+  d->tau = d->tau*d->dt;
+
+
+  d->sample = (int)(d->sample/d->dt);
+  sprintf(mesg,"Sample rate: %d",d->sample);
+  DEBUG(mesg);
+
 }
 
 

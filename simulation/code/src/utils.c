@@ -394,12 +394,12 @@ t_data Variables(char c, char *v, t_data d) {
     data.TT = atof(v);
     return data;
     break;
-  case 'U':
-    /* assignment */
+  case 'U':			/* Tau, characterisc time */
+    data.tau = atof(v);
     return data;
     break;
-  case 'V':
-    /* assignment */
+  case 'V':			/* Steps to take into account (s) */
+    data.t_min = atoi(v);
     return data;
     break;
   case 'W':
@@ -414,8 +414,8 @@ t_data Variables(char c, char *v, t_data d) {
     /* assignment */
     return data;
     break;
-  case 'Z':
-    /* assignment */
+  case 'Z':			/* Sample step */
+    data.sample = atoi(v);
     return data;
     break;
   default:
