@@ -355,12 +355,12 @@ t_data Variables(char c, char *v, t_data d) {
     /* assignment */
     return data;
     break;
-  case 'K':
-    /* assignment */
+  case 'K':			/* Perturbation type V */
+    data.pert_typeV = atoi(v);
     return data;
     break;
-  case 'L':
-    /* assignment */
+  case 'L':			/* Perturbation type R */
+    data.pert_typeR = atoi(v);
     return data;
     break;
   case 'M':			/* Maximum value of the scnanned variable */
@@ -375,12 +375,12 @@ t_data Variables(char c, char *v, t_data d) {
     /* assignment */
     return data;
     break;
-  case 'P':			/* Amplitude of the perturbation QIF */
-    data.pert_amplitude = atof(v);
+  case 'P':		       /* Amplitude of the perturbation QIF */
+    data.V_perturbation = atof(v);
     return data;
     break;
-  case 'Q':
-    /* assignment */
+  case 'Q':			/* Amplitude of the perturbation QIF */
+    data.R_perturbation = atof(v);
     return data;
     break;
   case 'R':			/* Boolean: periodic boundaries */
@@ -402,20 +402,20 @@ t_data Variables(char c, char *v, t_data d) {
     data.t_min = atoi(v);
     return data;
     break;
-  case 'W':
-    /* assignment */
+  case 'W':			/* Perturbation ON */
+    data.perturbation_ON = atoi(v);
     return data;
     break;
-  case 'X':
-    /* assignment */
+  case 'X':			/* Perturbation Max time */
+    data.perturbation_max_time = atoi(v);
     return data;
     break;
-  case 'Y':
-    /* assignment */
+  case 'Y':			/* Perturbation start point */
+    data.pert_start = atoi(v);
     return data;
     break;
   case 'Z':			/* Sample step */
-    data.sample = atoi(v);
+    data.sample = atof(v);
     return data;
     break;
   default:

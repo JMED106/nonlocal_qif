@@ -19,7 +19,7 @@ CC=gcc
 CFLAGS=-g -Wall -Wstrict-prototypes  -I$(NR_HEAD)  -I$(GNDIR) -I$(IDIR)
 
 # Included libraries
-COMPLIBS=-lm -lgsl -lgslcblas 
+COMPLIBS=-lm -lgsl -lgslcblas   -fopenmp
 COMPLIBS_PARALLEL=-lm -lgsl -lgslcblas  -fopenmp
 
 ## Object directory

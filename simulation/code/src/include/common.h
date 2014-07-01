@@ -1,6 +1,10 @@
 #ifndef __COMMON__
 #define __COMMON__
 
+
+void WarningFPE(int);
+
+
 typedef struct {
   int init_dist;		/* i: Type of initial distribution */
   double vr;			/* r: Reseting potential */
@@ -28,9 +32,17 @@ typedef struct {
   int disable_raster;
   char file[200];
   int voltdist;			/* Voltage distribution integer */
-  int pert;
-  double pert_amplitude;        /* P: Amplitude of the perturbation QIF */
-  double perturbation_FR;	/* FR *** Amplitude of the perturbation FR*/
+
+  /* Perturbation and external inputs */
+  int perturbation_ON;  	/* Pertubation is ON */
+  int perturbation_time;	/* Counter */
+  int perturbation_max_time;	/* Duration of the perturbation */
+  int pert_start;
+
+  double R_perturbation;	/* Amplitude for perturbations at R */
+  int pert_typeR;
+  double V_perturbation;	/* Amplitude for perturbations at V */
+  int pert_typeV;
 
   /* Related to the non-localized system */
   int l;			/* l: Number of clusters (columns) */
@@ -68,7 +80,7 @@ typedef struct {
   double tau_r;			/* Time to reach vreset from -infinity */
   int wait;			/* Refractory Time steps from vp to vr */
 
-  int sample;
+  double sample;
 } t_data;
 
   

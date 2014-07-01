@@ -15,6 +15,7 @@
 #include<gsl/gsl_rng.h>		/* GNU Scientific library */
 #include<gsl/gsl_randist.h>
 #include<omp.h>		        /* Parallel OMP library */
+#include <signal.h>
 
 
 
@@ -29,6 +30,9 @@ char mesg2[1024];
 int **spike;			/* Vector that contains number of spikes of each pop */
 int *spike2;
 unsigned long int  **Spikes;    /* Matrix that contains spikes of each neuron in each pop */
+double avg = 0;
+int count_avg = 0;
+double *avg_fri;
 
 /* Additional libraries (custom libraries) */
 #include "common.h"		/* This must be first */
@@ -43,12 +47,15 @@ unsigned long int  **Spikes;    /* Matrix that contains spikes of each neuron in
 double *InitCond(double *p, int N, int distr_type, double center, double gamma);
 double *InitialState(double *p, t_data d, int distr_type, double center, double gamma);
 double  MeanField(t_data d,int pop);
+double  MeanField2(t_data d,int pop);
 double at(double t, t_data d);
 t_data *Var_update(t_data *d);
 void    Intro(t_data *d, int *Nscan, int *tr_TT);
 char   *DataDebug(t_data d,FILE **file);
 void    Data_Files(t_data *d);
-void FiringRate(int *count, int *Tspikes, t_data d, FILE **file);
+double FiringRate(int *count, int *Tspikes, t_data d);
+double ExternalInputV(t_data *d, int type, int pop);
+double ExternalInputR(t_data *d, int type, int pop);
 
 /* === FUNCTION  main ====================
  * Description:  Program Body
@@ -62,6 +69,8 @@ int main(int argc, char **argv) {
   numthreads = omp_get_max_threads();
   omp_set_num_threads(numthreads);
 #endif  
+
+  (void) signal(SIGFPE,WarningFPE);
 
   /* +++++++++++++++++ External Things ++++++++++++++++++++++ */
 
@@ -83,7 +92,7 @@ int main(int argc, char **argv) {
   int i,j,t, t_max;
   int def = 0;
   int time_correction = 0;
-  int TIME;
+  double TIME;
 
   /* Parameters (all the parameters are stored in a structure) */
   t_data *d,*data;
@@ -99,6 +108,7 @@ int main(int argc, char **argv) {
   }
   t_file FileT;
 
+  FILE *scanning;
 
   /* Dynamic variables (system variables) */
   double *R,*R2,*V;
@@ -112,6 +122,8 @@ int main(int argc, char **argv) {
   double *pt,*pt2;	      /* Auxiliar pointer for initial dist. */
 
   int *count;
+
+  double Tavg = 0, Tcount = 0;
   
   /* ++++++++++++++++++++++++++++++++++++++++++++++++++ */
   
@@ -160,6 +172,8 @@ int main(int argc, char **argv) {
 
   count = ivector(1,d->l);  
 
+  avg_fri = dvector(1,d->l);
+
   d->R = &R;
   d->V = &V;
 
@@ -171,45 +185,69 @@ int main(int argc, char **argv) {
   /* Initial tunning: step size, and scanning issues */
   Intro(d,&Nscan,&time_correction);
   t_max = (int)((float)d->TT/d->dt);
+  d->scan = 0;
 
   /* Matrix for time correction */
   Spikes = ulimatrix(1,d->l,1,d->N);
   spike = imatrix(0,t_max,1,d->l);
   spike2 = ivector(1,d->l);
+  if(d->scan_mode > 0)
+    d = Var_update(d);
   /**********************************/
   /* New simulations can start here */
   /**********************************/
   do {        
 #pragma omp parallel for private(j) schedule(dynamic,chunksize)
     for(i=1 ;i<=d->l ;i++ ) {
-      R[i]=(d->J0+sqrt(d->J0*d->J0+4.*M_PI*M_PI*d->eta))/(2.*M_PI*M_PI)+0*1E-6;
-      /* R[i]+=-1E-4*cos(i*d->dx); */
-      rqif[i] = R[i];
-      rqif2[i] = R[i];
-      R2[i] = R[i];
-      V[i] = 0.0;
-      vqif[i] = 0.0;
+      avg_fri[i] = 0;
+      if(d->scan == 0) {
+	if(d->init_dist == 0) {	/* Initial State */
+	  if(d->J0*d->J0+4.*M_PI*M_PI*d->eta >= 0)
+	    R[i]=(d->J0+sqrt(d->J0*d->J0+4.*M_PI*M_PI*d->eta))/(2.*M_PI*M_PI);
+	  else
+	    R[i] = 0.1;
+	  if(R[i] < 0) R[i] = 0;
+	} else {
+	  R[i] = 0.0;
+	}
+	rqif[i] = R[i];
+	rqif2[i] = R[i];
+	R2[i] = R[i];
+
+	V[i] = 0.0;
+	vqif[i] = 0.-1;
+      } else if(i==1) {
+	/* we change the variable (J) */
+	d = Var_update(d);
+      }
       count[i] = 0;
       spike2[i] = 0;
       for(j=1 ;j<=d->N ;j++ ) 
 	Spikes[i][j] = 0;
     }
-    pt2 = InitCond(pt2,d->N,2,d->eta,d->Deta);      
-    /* Initial state of the QIF neurons */
-    for(i=1 ;i<=d->l ;i++ ) {
-      /* Each position has a given R, which is the width of .. */
-      /* .. the Lorentzian distribution */
-      pt = InitialState(pt,*d,2,V[i],R[i]);      
-      for(j=1 ;j<=d->N ;j++ ) {
-	QIF[i][j] = pt[j];
-	qif_eta[i][j] = pt2[j];
+    if(d->scan == 0) {
+      pt2 = InitCond(pt2,d->N,2,d->eta,d->Deta);      
+      /* Initial state of the QIF neurons */
+      for(i=1 ;i<=d->l ;i++ ) {
+	pt = InitialState(pt,*d,2,V[i],R[i]);      
+	for(j=1 ;j<=d->N ;j++ ) {
+	  if(d->N > 10) 
+	    QIF[i][j] = pt[j];
+	  else
+	    QIF[i][j] = 10;
+	  qif_eta[i][j] = pt2[j];
+	}
       }
-    }
+    } 
 
     /* printf("\nR[1] = %lf\td->R[0] = %lf\n",R[50],(*d->R)[50]); */
     /* File names */
     Data_Files(d);
-    
+    if(d->scan == 0) 
+      scanning = fopen(d->file_rvp_QIF,"w");
+    else
+      scanning = fopen(d->file_rvp_QIF,"a");
+
     /* Debbug  and openning files*/
     if(def == 0) DEBUG(DataDebug(*d,&file[0]));
     FileT = LoadFileLibrary(d->ftime, d->tmodes);
@@ -219,49 +257,67 @@ int main(int argc, char **argv) {
     t = 0;
     TIME = 0.0;
     d->t = 0;
+    Tavg = 0;
+    Tcount = 0;
+    
+    printf("\n\n%3d%%",(int)(t*100.0/t_max));
     /* Run */
     do {			/* Tiempo */
-      if(t == t_max/2) {
-	sprintf(mesg,"Perturbation.");	DEBUG(mesg);
+      /* if(TIME == d->TT/10)  */
+      /* 	for(i=1;i<=d->l;i++) */
+      /* 	    for(j=1 ;j<=d->N ;j++ )  */
+      /* 	      QIF[i][j]+=ExternalInputV(d,d->pert_typeV,i); */
+	
+      if(TIME*d->perturbation_ON >= d->pert_start && d->scan == 0) {	/* Perturbation */
+	d->perturbation_time++;
 	for(i=1; i<=d->l;i++) {
-	  R2[i]+=-1E-4*cos(i*d->dx)*d->pert_amplitude;
-	  rqif2[i]+=-1E-4*cos(i*d->dx)*d->pert_amplitude;
+	  V[i]+= ExternalInputV(d,d->pert_typeV,i);
+	  for(j=1 ;j<=d->N ;j++ ) 
+	    QIF[i][j]+=ExternalInputV(d,d->pert_typeV,i);
+	  R2[i]+= ExternalInputR(d,d->pert_typeR,i);
+	  rqif2[i]+=ExternalInputR(d,d->pert_typeR,i);
+	  if(R2[i] < 0) R2[i] = 0;
 	}
+	if(d->perturbation_time >= d->perturbation_max_time) 
+	  d->perturbation_ON = 0;
       }
-      if(t%(t_max/10) == 0) { /* Control point */
-	sprintf(mesg,"%d%% ",(int)(t*100.0/t_max));DEBUG(mesg); }
+      if(t%(t_max/100) == 0) { /* Control point */
+	printf("\b\b\b\b%3d%%",(int)(t*100.0/t_max));
+	fflush(stdout);
+	/* sprintf(mesg,"%d%% ",(int)(t*100.0/t_max));DEBUG(mesg); */} 
 #pragma omp parallel for  schedule(dynamic,chunksize)
       for(i=1 ;i<=d->l ;i++ ) { 	/* Espacio */
 	N_F(J,R2,i,*d);
-	N_F(Jqif,rqif2,i,*d);
+	N_F(Jqif,rqif2,i,*d);	
 	/* We integrate the ODEs */
-	R[i] += d->dt*(d->Deta/M_PI + 2.*R[i]*V[i]);
-	V[i] += d->dt*(d->eta + pow(V[i],2) - pow(R[i]*M_PI,2) + J[i]);
+	R[i] += d->dt*(2.*R2[i]*V[i]);
+	V[i] += d->dt*(d->eta + V[i]*V[i] - R2[i]*M_PI*R2[i]*M_PI + J[i]);
 	/* QIF integration */
 	F_QIF(QIF[i],qif_eta[i],Jqif[i],i,*d);
 	/* r and v are computed */
 	rqif[i] = MeanField(*d,i);
+	/* if(i==10) printf("\nMeanField %lf",rqif[10]); */
 	count[i]++;
 	/* v here */
       }
 
       /* Results are stored */
+  
       for(i=1 ;i<=d->l ;i++ ) {
 	R2[i] = R[i];
 	rqif2[i] = rqif[i];
-	fprintf(file[1] ,"%lf ",R[i]);
-	fprintf(file[2] ,"%lf ",V[i]);
-
-	/* fprintf(file[4] ,"%lf ",rqif[i]); */
-
-	/* Firing rate of QIF */
-	if(t%d->sample == 0) 
-	  FiringRate(&count[i], &spike2[i], *d, &file[4]);
+	if(TIME >= 1) {
+	 
+	  fprintf(file[1] ,"%g %g %g \n",TIME,(i-1)*2*M_PI/(d->l-1)-M_PI,R[i]);
+	  fprintf(file[2] ,"%g %g %g \n ",TIME,(i-1)*2*M_PI/(d->l-1)-M_PI,V[i]);
+	  if(i==d->l){ fprintf(file[1],"\n"); fprintf(file[2],"\n");}
+	  /* Firing rate of QIF */
+	  if(t%(int)d->sample == 0) {
+	    fprintf(file[4],"%g %g %g \n",((double)d->t-count[i]/2.0)*d->dt,(i-1)*2*M_PI/(d->l-1)-M_PI,FiringRate(&count[i], &spike2[i], *d));
+	    if(i==d->l){ fprintf(file[4],"\n"); Tavg +=avg; Tcount++;}
+	  }
+	}
       }
-      fprintf(file[1] ,"\n");
-      fprintf(file[2] ,"\n");
-      if(t%d->sample == 0) 
-	fprintf(file[4] ,"\n");
 
       d->t++;
       t++;
@@ -276,12 +332,23 @@ int main(int argc, char **argv) {
     for(i=1 ;i<=d->l ;i++ ) 
       fprintf(file[3] ,"%lf\t%lf\t%lf\t%lf\n",-M_PI + i*d->dx,rqif[i],V[i],Jqif[i]);
     
-    sprintf(mesg,"%d%% ",(int)(t*100.0/t_max));
-    DEBUG(mesg);
+    /* sprintf(mesg,"%d%% ",(int)(t*100.0/t_max)); */
+    /* DEBUG(mesg);*/
+    printf("\n");
     FileT.closeall(&file,&FileT);
-    free_dvector(pt,1,d->N);
-    free_dvector(pt2,1,d->N);
+    if(d->scan == 0) {
+      free_dvector(pt,1,d->N);
+      free_dvector(pt2,1,d->N);
+    }
+    d->scan++;
+    if(d->scan_mode >0 ) {
+      fprintf(scanning,"%lf\t%lf\n",d->var_value,Tavg/Tcount);
+      fclose(scanning);
+      avg = 0; count_avg = 0;
+    }
   } while (d->scan < Nscan);  /* Simulation ends here */
+
+
 
 
   free_dvector(R,1,d->l);
@@ -302,6 +369,7 @@ int main(int argc, char **argv) {
   free_imatrix(spike,0,t_max,1,d->l);
   free_ivector(spike2,1,d->l);
 
+  free_dvector(avg_fri,1,d->l);
 
   free(d);
   system("rm -r ./temp");
@@ -400,6 +468,36 @@ double *InitialState(double *p, t_data d, int distr_type, double center, double 
 }
 
 
+/* === FUNCTION  MeanField2 ====================
+ * Description:  Computes S
+ *   Variables:  all th_i
+ * ======================================= */
+
+double MeanField2(t_data d,int pop) {
+  int i;
+  double s = 0;
+  double delta = 1.0/d.dt;
+  double norm = (1.0/d.N)*delta;
+
+  double t_min = 0;
+  spike[d.t][pop] = 0;
+
+  for(i=1 ;i<=d.N ;i++ ) { 
+    if(Spikes[pop][i] == d.t_spike) 
+      spike[d.t][pop]+= 1;
+  }
+  spike2[pop] += spike[d.t][pop];
+  
+  if(d.t_min >= d.t) t_min = d.t;
+  else t_min = d.t_min;
+
+  for(i=d.t-t_min ;i<=d.t ;i++ )
+    s+=spike[i][pop];
+
+   s = s*norm/t_min;
+  return s;
+}
+
 /* === FUNCTION  MeanField ====================
  * Description:  Computes S
  *   Variables:  all th_i
@@ -410,7 +508,6 @@ double MeanField(t_data d,int pop) {
   double s = 0;
   double delta = 1.0/d.dt;
   double norm = (1.0/d.N)*delta;
-  double norm2 = (1.0*M_PI/d.N)*delta;
   double norm3 = (1.0/d.N);
   double t_min = 0;
   spike[d.t][pop] = 0;
@@ -419,24 +516,21 @@ double MeanField(t_data d,int pop) {
     if(Spikes[pop][i] == d.t_spike) 
       spike[d.t][pop]+= 1;
   }
-  /* if(s > 5) { */
-  /*   sprintf(mesg,"t: %lf\ti= %d\ts1 = %lf\ts1_norm = %lf ",d.t*d.dt,pop, s,s*norm);   DEBUG(mesg);} */
-
   spike2[pop] += spike[d.t][pop];
   
   if(d.t_min >= d.t) t_min = d.t;
   else t_min = d.t_min;
+
   for(i=d.t-t_min ;i<=d.t ;i++ )
     s+=at((d.t-i)*d.dt,d)*spike[i][pop];
 
-  if(d.t < 100) s = spike[d.t][pop]*norm;
+  if(d.t < 0) s = spike[d.t][pop]*norm;
   else
-    s = s*norm3;	
-  /* if(s > 5) { */
-  /*   sprintf(mesg,"t: %lf\ti= %d\ts2 = %lf ",d.t*d.dt,pop, s);   DEBUG(mesg);} */
-
+    s = s*norm3;
+  /* s = spike[d.t][pop]*norm; */
   return s;
 }
+
 
 /* === FUNCTION  at ====================
  * Description:  Exponential function for s(t)
@@ -499,8 +593,6 @@ void Intro(t_data *d, int *Nscan, int *tr_TT) {
   int max_bits = 8*sizeof(unsigned long int); /* Architecture of the machine */
   char *var_name[4] = {"J","eta"};
   double scanstep = 0;
-  double min_dt = 0.0;
-
 
   /** DEBUG ***********************************************/
   sprintf(mesg,"Entering debug mode [%d] ...",d_level);
@@ -538,13 +630,14 @@ void Intro(t_data *d, int *Nscan, int *tr_TT) {
   d->dx = 2.0*M_PI/d->l;
 
   /* d.tau from at */
+  d->t_min = 10;
   d->tau = d->tau*d->dt;
 
-
   d->sample = (int)(d->sample/d->dt);
-  sprintf(mesg,"Sample rate: %d",d->sample);
+  sprintf(mesg,"Sample rate: %.0lf",d->sample);
   DEBUG(mesg);
 
+  d->perturbation_time = 0;
 }
 
 
@@ -597,18 +690,76 @@ void Data_Files(t_data *d) {
   /* (d->tmodes)[5] = "w"; */
 
   if(d->scan_mode > 0) {    
-    sprintf(d->file_rvp_FR,"./results/%s/rvp_FR_%.lf.txt",d->file,d->var_value);
-    sprintf(d->file_rvp_QIF,"./results/%s/rvp_QIF_%.lf.txt",d->file,d->var_value); 
+    sprintf(d->file_rvp_FR,"./results/%s/rvp_FR.txt",d->file);
+    sprintf(d->file_rvp_QIF,"./results/%s/rvp_QIF.txt",d->file); 
   }
 }
 
-void FiringRate(int *count, int *Tspikes, t_data d, FILE **file) {
+double FiringRate(int *count, int *Tspikes, t_data d) {
   double inst_fr_avg = 0;
 
   inst_fr_avg  = (double)*Tspikes/(double)*count;
   inst_fr_avg  = inst_fr_avg/(d.N*d.dt);
+
+  /* if(d.t > ((double)d.TT/d.dt)/2) { */
+  /*   avg+=inst_fr_avg/d.l; */
+  /*   count_avg++; */
+  /* } */
+  avg = inst_fr_avg;
   *count = 0;
-  fprintf(*file,"%lf ",inst_fr_avg);
-  inst_fr_avg = 0;
+  
   *Tspikes = 0;
+  return inst_fr_avg;
+}
+
+
+
+/* === FUNCTION  ExternalInput V ====================
+ * Description:  Perturbation at V
+ *   Variables:  
+ * ======================================= */
+
+double ExternalInputV(t_data *d, int type, int pop) {
+
+  double out = 0;
+  switch(type) {
+  case 0:			/* Homogeneous current */
+    out =  d->V_perturbation*d->perturbation_ON;
+    break;
+  case 1:			/* Modulated perturbation */
+    out = d->V_perturbation*cos(pop*d->dx)*d->perturbation_ON;
+    break;
+  default:
+    break;
+  }
+  return out;
+}
+
+
+/* === FUNCTION  ExternalInput ====================
+ * Description:  Perturbation at R
+ *   Variables:  
+ * ======================================= */
+
+double ExternalInputR(t_data *d, int type, int pop) {
+
+  double out = 0;
+  switch(type) {
+  case 0:			/* Homogeneous current */
+    out =  d->R_perturbation*d->perturbation_ON;
+    break;
+  case 1:			/* Modulated perturbation */
+    out = d->R_perturbation*cos(pop*d->dx)*d->perturbation_ON;
+    break;
+  default:
+    break;
+  }
+  return out;
+}
+
+void
+WarningFPE(int sig) {
+
+  printf("\nFloating Point exception\n");
+  exit(sig);
 }
